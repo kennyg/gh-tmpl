@@ -88,8 +88,30 @@ if ! git --no-pager diff --exit-code -- $paths || [ -n "$untracked" ]; then
 fi
 """
 
+[tasks.verify]
+description = "Check the Lean proofs in verify/ and write the Lean test cases again"
+dir = "verify"
+run = [
+  "lake build --wfail",
+  "lake exe corpus ..",
+]
+
+[tasks."verify:check"]
+description = "Fail if a Lean proof fails or the Lean test cases are out of date, then run the differential tests"
+depends = ["verify"]
+run = """
+paths="internal/check/testdata/lean internal/cli/testdata/lean internal/discover/testdata/lean"
+untracked=$(git ls-files --others --exclude-standard -- $paths)
+if ! git --no-pager diff --stat --exit-code -- $paths || [ -n "$untracked" ]; then
+  echo "The Lean test cases are out of date. Run 'mise run verify' and commit the result."
+  [ -n "$untracked" ] && echo "New files: $untracked"
+  exit 1
+fi
+go test -run MatchesLean ./internal/...
+"""
+
 [tasks.check]
-description = "Run every check that CI runs"
+description = "Run every check that CI runs, except the Lean proofs (mise run verify:check)"
 depends = ["test", "lint", "vuln", "lint:actions", "release:check", "generate:check"]
 
 [tasks.install-local]
