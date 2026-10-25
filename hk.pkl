@@ -1,0 +1,50 @@
+amends "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.8.1/hk@2.8.1#/Builtins.pkl"
+
+// Test fixtures hold exact bytes on purpose, so text fixers skip them.
+local fixtures = List("**/testdata/**")
+
+local linters = new Mapping<String, Step> {
+    ["gofmt"] = Builtins.go_fmt
+    ["go-mod-tidy"] = Builtins.gomod_tidy
+    ["golangci-lint"] = Builtins.golangci_lint
+    ["actionlint"] = Builtins.actionlint
+    ["zizmor"] = (Builtins.zizmor) {
+        check = "zizmor --offline {{files}}"
+    }
+    ["typos"] = (Builtins.typos) {
+        exclude = fixtures
+    }
+    ["trailing-whitespace"] = (Builtins.trailing_whitespace) {
+        exclude = fixtures
+    }
+    ["newlines"] = (Builtins.newlines) {
+        exclude = fixtures
+    }
+    ["mixed-line-ending"] = Builtins.mixed_line_ending
+    ["check-merge-conflict"] = Builtins.check_merge_conflict
+    ["detect-private-key"] = Builtins.detect_private_key
+}
+
+hooks {
+    ["pre-commit"] {
+        fix = true
+        stash = "git"
+        steps = linters
+    }
+    ["pre-push"] {
+        steps = (linters) {
+            ["go-test"] {
+                glob = List("**/*.go", "go.mod", "go.sum", "**/testdata/**")
+                check = "go test ./..."
+            }
+        }
+    }
+    ["fix"] {
+        fix = true
+        steps = linters
+    }
+    ["check"] {
+        steps = linters
+    }
+}
