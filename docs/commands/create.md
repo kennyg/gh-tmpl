@@ -45,7 +45,7 @@ The gh-tmpl flags start with `--tmpl-`, so they cannot clash with a `gh` flag.
 | Code | Meaning |
 | --- | --- |
 | 1 | The body failed the check. gh-tmpl did not run `gh`. |
-| 2 | Bad gh-tmpl flags, or no single template to check against. |
+| 2 | Bad gh-tmpl flags, no single template to check against, or a `--repo` repository that does not exist or that the token cannot read. |
 | Other | The exit code of `gh`. |
 
 ## Examples

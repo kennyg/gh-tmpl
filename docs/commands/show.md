@@ -74,7 +74,7 @@ feature_request  Feature request  .github/ISSUE_TEMPLATE/feature_request.yml (fo
 | Code | Meaning |
 | --- | --- |
 | 0 | gh-tmpl printed the template or the list. |
-| 2 | Bad flags, no template, several templates and no `--name`, or no match for `--name`. |
+| 2 | Bad flags, no template, several templates and no `--name`, no match for `--name`, or a `--repo` repository that does not exist or that the token cannot read. |
 
 ## Examples
 

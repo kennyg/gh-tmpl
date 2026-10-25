@@ -94,10 +94,15 @@ type Result struct {
 // holds at least one template. A source is a function so that a caller can
 // delay costly setup, such as an API client, until discovery needs it.
 // A source function that returns a nil FS is skipped.
+//
+// The first source must exist: if its root cannot be listed, Find returns
+// ErrRepoNotFound. A later source is a fallback, such as the owner's shared
+// .github repository, which most owners do not have. A missing fallback
+// counts as having no templates.
 func Find(ctx context.Context, kind Kind, sources ...func() (FS, error)) (Result, error) {
 	var last Result
 	last.Kind = kind
-	for _, open := range sources {
+	for i, open := range sources {
 		fsys, err := open()
 		if err != nil {
 			return last, err
@@ -106,6 +111,9 @@ func Find(ctx context.Context, kind Kind, sources ...func() (FS, error)) (Result
 			continue
 		}
 		res, err := FindIn(ctx, fsys, kind)
+		if i > 0 && errors.Is(err, ErrRepoNotFound) {
+			continue
+		}
 		if err != nil {
 			return res, err
 		}
@@ -130,7 +138,7 @@ func FindIn(ctx context.Context, fsys FS, kind Kind) (Result, error) {
 	// discovery does not ask the API for folders that are not there.
 	root, err := fsys.ReadDir(ctx, "")
 	if errors.Is(err, fs.ErrNotExist) {
-		return res, nil
+		return res, fmt.Errorf("%s: %w", fsys.Source(), ErrRepoNotFound)
 	}
 	if err != nil {
 		return res, fmt.Errorf("reading %s in %s: %w", displayDir(""), fsys.Source(), err)
@@ -336,6 +344,11 @@ func decodeYAML(data []byte, v any) (err error) {
 	}
 	return err
 }
+
+// ErrRepoNotFound reports a repository whose root cannot be listed. Through
+// the API, that means the repository does not exist or the token cannot
+// read it.
+var ErrRepoNotFound = errors.New("repository not found, or the token cannot read it")
 
 // Errors returned by Select.
 var (

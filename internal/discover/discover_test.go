@@ -354,6 +354,19 @@ func TestFindFallsBackToSecondSource(t *testing.T) {
 		t.Errorf("opened the fallback source although the first had templates")
 	}
 
+	// A missing first source is an error. A missing fallback is not.
+	missing := NewRemote(staticAPIErr{}, "github.com", "octo", "missing")
+	if _, err := Find(context.Background(), PR, func() (FS, error) { return missing, nil }); !errors.Is(err, ErrRepoNotFound) {
+		t.Errorf("missing first source: err = %v, want ErrRepoNotFound", err)
+	}
+	res, err = Find(context.Background(), PR,
+		func() (FS, error) { return local, nil },
+		func() (FS, error) { return missing, nil },
+	)
+	if err != nil || len(res.Templates) != 0 {
+		t.Errorf("missing fallback: %+v, %v", res, err)
+	}
+
 	// A nil source is skipped.
 	res, err = Find(context.Background(), PR, func() (FS, error) { return nil, nil })
 	if err != nil || len(res.Templates) != 0 {
@@ -399,6 +412,13 @@ func TestRemoteFSSkipsUnsafeNames(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name != "ok.md" {
 		t.Fatalf("entries = %+v", entries)
 	}
+}
+
+// staticAPIErr answers every request with 404 Not Found.
+type staticAPIErr struct{}
+
+func (staticAPIErr) RequestWithContext(_ context.Context, _, p string, _ io.Reader) (*http.Response, error) {
+	return nil, notFound(p)
 }
 
 type staticAPI string

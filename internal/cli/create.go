@@ -38,13 +38,14 @@ Examples:
 // the short form, or "" if there is none.
 var ghFlags = map[discover.Kind]map[string]string{
 	discover.PR: {
-		"assignee": "a", "base": "B", "body": "b", "body-file": "F", "head": "H",
+		"assignee": "a", "attach": "", "base": "B", "body": "b", "body-file": "F", "head": "H",
 		"label": "l", "milestone": "m", "project": "p", "recover": "", "reviewer": "r",
 		"template": "T", "title": "t", "repo": "R",
 	},
 	discover.Issue: {
-		"assignee": "a", "body": "b", "body-file": "F", "label": "l", "milestone": "m",
-		"project": "p", "recover": "", "template": "T", "title": "t", "repo": "R", "type": "",
+		"assignee": "a", "attach": "", "blocked-by": "", "blocking": "", "body": "b", "body-file": "F",
+		"label": "l", "milestone": "m", "parent": "", "project": "p", "recover": "", "template": "T",
+		"title": "t", "repo": "R", "type": "",
 	},
 }
 

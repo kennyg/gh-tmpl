@@ -63,6 +63,8 @@ GitHub uses the templates in an owner's `.github` repository for every repositor
 
 gh-tmpl reads the fallback only if the first source has no template of the kind. It searches the fallback with the same locations and precedence.
 
+The first source must exist. If the `--repo` repository does not exist, or the token cannot read it, gh-tmpl stops with exit code 2. It does not read the fallback, so a typing error in `--repo` cannot make a check pass. A missing `OWNER/.github` repository is normal, and gh-tmpl treats it as having no templates.
+
 gh-tmpl reads the clone's remote, or `GH_REPO`, to find the owner and host. It uses the GitHub REST contents API on the repository's default branch. If there is no GitHub remote, gh-tmpl skips the fallback. If `gh` has no login for the host, gh-tmpl prints a note and skips the fallback.
 
 Use `--offline` to skip the fallback. With it, gh-tmpl makes no API requests in a clone.

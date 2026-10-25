@@ -304,6 +304,8 @@ func TestOrgFallback(t *testing.T) {
 		return fakeContents(func(p string) (any, bool) {
 			requested = append(requested, p)
 			switch p {
+			case "repos/octo/api/contents":
+				return []map[string]string{{"name": "README.md", "type": "file"}}, true
 			case "repos/octo/.github/contents":
 				return []map[string]string{{"name": "pull_request_template.md", "type": "file"}}, true
 			case "repos/octo/.github/contents/pull_request_template.md":
@@ -331,6 +333,69 @@ func TestOrgFallback(t *testing.T) {
 	}
 	if len(requested) == 0 || requested[0] != "repos/octo/api/contents" {
 		t.Errorf("requests = %v", requested)
+	}
+}
+
+func TestRepoNotFoundFails(t *testing.T) {
+	h := newHarness(t, "")
+	h.env.NewClient = func(string) (discover.Requester, error) {
+		// Only the owner's shared repository exists, with a template.
+		return fakeContents(func(p string) (any, bool) {
+			switch p {
+			case "repos/octo/.github/contents":
+				return []map[string]string{{"name": "pull_request_template.md", "type": "file"}}, true
+			case "repos/octo/.github/contents/pull_request_template.md":
+				return file("## Shared\n"), true
+			}
+			return nil, false
+		}), nil
+	}
+	body := h.write(t, "b.md", "junk")
+	for _, args := range [][]string{
+		{"check", "--repo", "github.com/octo/missing", "--body-file", body},
+		{"check", "--repo", "github.com/octo/missing", "--body-file", body, "--json"},
+		{"show", "--repo", "github.com/octo/missing"},
+		{"pr", "create", "--repo", "github.com/octo/missing", "--body-file", body},
+	} {
+		code := h.run(args...)
+		if code != ExitUsage {
+			t.Errorf("%v: exit %d, want %d\nstdout: %s", args, code, ExitUsage, h.stdout)
+		}
+		if !strings.Contains(h.stderr.String(), "github.com/octo/missing: repository not found") {
+			t.Errorf("%v: stderr = %s", args, h.stderr)
+		}
+		if strings.Contains(h.stdout.String(), `"ok": true`) || strings.Contains(h.stdout.String(), "PASS") {
+			t.Errorf("%v: reported a pass: %s", args, h.stdout)
+		}
+	}
+	if len(h.calls) != 0 {
+		t.Errorf("ran gh for a missing repository: %v", h.calls)
+	}
+}
+
+func TestCheckJSONListsTemplatesWhenAmbiguous(t *testing.T) {
+	h := newHarness(t, "issue-mixed")
+	body := h.write(t, "b.md", "x")
+	for _, args := range [][]string{
+		{"check", "issue", "--body-file", body, "--json"},
+		{"check", "issue", "--body-file", body, "--json", "--name", "nope"},
+	} {
+		if code := h.run(args...); code != ExitUsage {
+			t.Fatalf("%v: exit %d", args, code)
+		}
+		var out struct {
+			OK        bool   `json:"ok"`
+			Error     string `json:"error"`
+			Templates []struct {
+				ID string `json:"id"`
+			} `json:"templates"`
+		}
+		if err := json.Unmarshal(h.stdout.Bytes(), &out); err != nil {
+			t.Fatal(err)
+		}
+		if out.OK || out.Error == "" || len(out.Templates) != 2 || out.Templates[0].ID != "bug_report" {
+			t.Errorf("%v: json = %s", args, h.stdout)
+		}
 	}
 }
 

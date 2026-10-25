@@ -107,7 +107,15 @@ func runCheck(ctx context.Context, env *Env, args []string) int {
 			return ExitOK
 		}
 		if err != nil {
-			return usageFail(env, asJSON, selectErrorOrPlain(env, res, err, "--name", o.name))
+			msg := selectErrorOrPlain(env, res, err, "--name", o.name)
+			if asJSON && (errors.Is(err, discover.ErrAmbiguous) || errors.Is(err, discover.ErrNoMatch)) {
+				// List the choices, so that a program that reads only the
+				// JSON knows which names it can pass.
+				_ = writeJSON(env.Stdout, map[string]any{"ok": false, "error": msg, "kind": kind, "templates": infos(res)})
+				warnf(env, "%s", msg)
+				return ExitUsage
+			}
+			return usageFail(env, asJSON, msg)
 		}
 	}
 
