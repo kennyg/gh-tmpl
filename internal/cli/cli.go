@@ -13,8 +13,10 @@ import (
 	"github.com/cli/go-gh/v2"
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/repository"
+	"github.com/jdx/usage/go/argv"
 
 	"github.com/kennyg/gh-tmpl/internal/discover"
+	"github.com/kennyg/gh-tmpl/internal/spec"
 )
 
 // Exit codes.
@@ -92,54 +94,99 @@ func runGh(ctx context.Context, args []string, stdin io.Reader) (int, error) {
 	return ExitOK, nil
 }
 
-const usage = `Write and check issue and pull request bodies against a repository's templates.
+//go:generate usage generate go -f ../../gh-tmpl.usage.kdl -o ../spec/spec.go -p spec
 
-Usage:
-  gh tmpl show [pr|issue] [--name <template>] [--form <name>] [--list] [--json]
-  gh tmpl check [pr|issue] (--body-file <file> | --body <text>) [--name <template>] [--json]
-  gh tmpl pr create [gh pr create flags] [--tmpl-name <template>]
-  gh tmpl issue create [gh issue create flags] [--tmpl-name <template>]
-
-Commands:
-  show     Print a template, or list the templates when there are several.
-  check    Check a body against a template. Exits 1 if the body fails.
-  pr       Check the body, then run "gh pr create" with the other flags.
-  issue    Check the body, then run "gh issue create" with the other flags.
-
-Run "gh tmpl <command> --help" for the flags of a command.
-Docs: https://github.com/kennyg/gh-tmpl#readme
-`
-
-// Run runs one command and returns the exit code.
+// Run runs one command and returns the exit code. The parser, the help
+// pages and the completion answers all come from the tables that "usage
+// generate go" builds from gh-tmpl.usage.kdl.
 func Run(ctx context.Context, env *Env, args []string) int {
+	// A completion script calls the binary back with a hidden command.
+	if out, ok := argv.Respond(args, spec.Root, spec.HelpText, spec.Meta); ok {
+		fmt.Fprint(env.Stdout, out)
+		return ExitOK
+	}
 	if len(args) == 0 {
-		fmt.Fprint(env.Stderr, usage)
+		fmt.Fprint(env.Stderr, argv.ShortHelp(helpMeta(env), []string{displayName}, []*argv.Command{spec.Root}, spec.HelpText))
 		return ExitUsage
 	}
-	switch args[0] {
-	case "-h", "--help", "help":
-		fmt.Fprint(env.Stdout, usage)
-		return ExitOK
-	case "-v", "--version", "version":
-		fmt.Fprintf(env.Stdout, "gh-tmpl %s\n", env.Version)
-		return ExitOK
-	case "show":
-		return runShow(ctx, env, args[1:])
-	case "check":
-		return runCheck(ctx, env, args[1:])
-	case "pr", "issue":
-		if len(args) < 2 || args[1] != "create" {
-			fmt.Fprintf(env.Stderr, "gh-tmpl: only \"gh tmpl %s create\" is supported\n", args[0])
+	cli, err := spec.Parse(args)
+	if err != nil {
+		var perr *argv.Error
+		if !errors.As(err, &perr) {
+			warnf(env, "%v", err)
 			return ExitUsage
 		}
-		kind := discover.PR
-		if args[0] == "issue" {
-			kind = discover.Issue
+		if perr.Code == argv.CodeVersion {
+			fmt.Fprintf(env.Stdout, "%s %s\n", spec.HelpMeta.Bin, env.Version)
+			return ExitOK
 		}
-		return runCreate(ctx, env, kind, args[2:])
+		if text, ok := argv.RenderRequest(perr, helpMeta(env), spec.Root, args, spec.HelpText); ok {
+			fmt.Fprint(env.Stdout, text)
+			return ExitOK
+		}
+		pos := argv.Walk(spec.Root, args)
+		path := []string{displayName}
+		for _, c := range pos.Chain[1:] {
+			path = append(path, c.Name)
+		}
+		fmt.Fprint(env.Stderr, argv.Render(perr, path, pos.Chain, spec.HelpText))
+		return ExitUsage
 	}
-	fmt.Fprintf(env.Stderr, "gh-tmpl: unknown command %q\n\n%s", args[0], usage)
+
+	switch {
+	case cli.Show != nil:
+		return runShow(ctx, env, cli.Show)
+	case cli.Check != nil:
+		return runCheck(ctx, env, cli.Check)
+	case cli.Pr != nil:
+		c := cli.Pr.Create
+		if c == nil {
+			return missingSubcommand(env, "pr")
+		}
+		return runCreate(ctx, env, discover.PR, c.GhArgs, createOpts{
+			checkOpts: checkOpts{name: c.TmplName, strict: c.TmplStrict, allowUnchecked: c.TmplAllowUnchecked},
+			offline:   c.TmplOffline,
+			skip:      c.TmplSkip,
+		})
+	case cli.Issue != nil:
+		c := cli.Issue.Create
+		if c == nil {
+			return missingSubcommand(env, "issue")
+		}
+		return runCreate(ctx, env, discover.Issue, c.GhArgs, createOpts{
+			checkOpts: checkOpts{name: c.TmplName, strict: c.TmplStrict, allowUnchecked: c.TmplAllowUnchecked},
+			offline:   c.TmplOffline,
+			skip:      c.TmplSkip,
+		})
+	case cli.Completion != nil:
+		shell, _ := argv.ShellNamed(cli.Completion.Shell)
+		fmt.Fprint(env.Stdout, argv.Script(spec.HelpMeta.Bin, shell))
+		return ExitOK
+	}
 	return ExitUsage
+}
+
+// missingSubcommand prints the help of a command that needs a subcommand.
+// The generated parser does not enforce subcommand_required, so the
+// dispatcher does.
+func missingSubcommand(env *Env, name string) int {
+	pos := argv.Walk(spec.Root, []string{name})
+	fmt.Fprintf(env.Stderr, "error: %q needs a subcommand\n\n", name)
+	fmt.Fprint(env.Stderr, argv.ShortHelp(helpMeta(env), []string{displayName, name}, pos.Chain, spec.HelpText))
+	return ExitUsage
+}
+
+// displayName is how people run the extension. Help pages and errors use
+// it. Completion scripts use the binary name, gh-tmpl, because gh does not
+// complete the commands of extensions.
+const displayName = "gh tmpl"
+
+// helpMeta returns the help page header with the version of this build.
+func helpMeta(env *Env) argv.HelpSpec {
+	meta := spec.HelpMeta
+	meta.Bin = displayName
+	meta.Version = env.Version
+	return meta
 }
 
 func warnf(env *Env, format string, a ...any) {

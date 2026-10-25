@@ -1,0 +1,3 @@
+# Check out text files with LF line endings on every platform. Test
+# fixtures and generated files must match byte for byte.
+* text=auto eol=lf

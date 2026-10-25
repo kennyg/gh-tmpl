@@ -10,19 +10,11 @@ The kind is `pr` or `issue`. It defaults to `pr`.
 
 ## Flags
 
-| Flag | Meaning |
-| --- | --- |
-| `-F`, `--body-file <file>` | Read the body from a file. Use `-` for standard input. |
-| `-b`, `--body <text>` | The body text. |
-| `--name <template>` | Check against this template. See [gh tmpl show](show.md#pick-a-template). |
-| `--template-file <file>` | Check against a template file on disk. gh-tmpl does not search for one. A `.yml` or `.yaml` file is an issue form. |
-| `--strict` | Fail on warnings too. |
-| `--allow-unchecked` | Report an untouched checklist as a warning, not an error. |
-| `--json` | Print the report as JSON. |
-| `-R`, `--repo <[HOST/]OWNER/REPO>` | Read the templates of another repository through the API. |
-| `--offline` | Do not read the owner's shared `.github` repository. |
+[The generated reference for `gh tmpl check`](../reference/check.md) lists every flag. These need more words:
 
-[How the check decides pass or fail](../check-rules.md) lists every rule.
+- `--body-file -` reads the body from standard input. `--body` and `--body-file` cannot be given together. An empty body is a usage error, exit 2.
+- `--template-file` checks against a template file on disk instead of discovering one. A `.yml` or `.yaml` file is an issue form.
+- `--strict` fails on warnings too. `--allow-unchecked` reports an untouched checklist as a warning, not an error.
 
 ## Text output
 

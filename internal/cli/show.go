@@ -6,56 +6,16 @@ import (
 	"strings"
 
 	"github.com/kennyg/gh-tmpl/internal/discover"
+	"github.com/kennyg/gh-tmpl/internal/spec"
 )
 
-const showHelp = `Print a pull request or issue template.
-
-Usage:
-  gh tmpl show [pr|issue] [flags]
-
-The kind defaults to pr. With several templates and no --name, the command
-lists them and exits 2. A pull request uses the single-file template, such
-as .github/pull_request_template.md, when there is one.
-
-An issue form (.yml) prints as Markdown sections that match the body GitHub
-writes for a submitted form. Use --raw to print the YAML.
-
-Examples:
-  gh tmpl show pr > body.md
-  gh tmpl show issue --list
-  gh tmpl show issue --form bug_report > body.md
-  gh tmpl show issue --name feature_request --json
-`
-
-func runShow(ctx context.Context, env *Env, args []string) int {
-	fs := newFlagSet(env, "show", showHelp)
-	var l lookup
-	var name, formName string
-	var raw, asJSON, list bool
-	fs.StringVar(&name, "name", "", "pick the template with this `ID`, file name or name")
-	fs.StringVar(&formName, "form", "", "pick the issue form with this `ID` and print it as Markdown")
-	fs.BoolVar(&raw, "raw", false, "print the file as it is, front matter or YAML included")
-	fs.BoolVar(&asJSON, "json", false, "print JSON")
-	fs.BoolVar(&list, "list", false, "list the templates")
-	fs.StringVar(&l.repo, "repo", "", "read the templates of `[HOST/]OWNER/REPO` through the API")
-	fs.StringVar(&l.repo, "R", "", "short for --repo")
-	fs.BoolVar(&l.offline, "offline", false, "do not read the owner's shared .github repository")
-	pos, err := parseArgs(fs, args)
-	if err != nil {
-		return flagExit(err)
-	}
-	kind, err := kindArg(pos)
-	if err != nil {
-		warnf(env, "%v", err)
-		return ExitUsage
-	}
+func runShow(ctx context.Context, env *Env, c *spec.ShowCmd) int {
+	l := lookup{repo: c.Repo, offline: c.Offline}
+	name, formName, raw, asJSON, list := c.Name, c.Form, c.Raw, c.Json, c.List
+	kind := kindOf(c.Kind)
 	if formName != "" {
-		if len(pos) == 1 && kind != discover.Issue {
+		if c.Kind == string(discover.PR) {
 			warnf(env, "--form works with issue templates only")
-			return ExitUsage
-		}
-		if name != "" {
-			warnf(env, "use --name or --form, not both")
 			return ExitUsage
 		}
 		kind, name = discover.Issue, formName

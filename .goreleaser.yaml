@@ -49,6 +49,10 @@ archives:
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Tag }}_checksums.txt"
   algorithm: sha256
+  # List the man page and completions too, so the attestation covers them.
+  extra_files:
+    - glob: ./man/gh-tmpl.1
+    - glob: ./completions/*
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
@@ -63,3 +67,9 @@ changelog:
 release:
   draft: false
   prerelease: auto
+  # The man page and completion scripts come from gh-tmpl.usage.kdl. gh
+  # extension install ignores them, because their names do not end in
+  # <os>-<arch>.
+  extra_files:
+    - glob: ./man/gh-tmpl.1
+    - glob: ./completions/*

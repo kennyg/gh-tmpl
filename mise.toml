@@ -8,6 +8,7 @@ pkl = "0.32.2"
 actionlint = "1.7.12"
 zizmor = "1.31.1"
 typos = "1.51.1"
+usage = { version = "7.1.2", workflow = "publish-cli.yml" }
 
 [env]
 CGO_ENABLED = "0"
@@ -45,9 +46,51 @@ run = "goreleaser check"
 description = "Build every release artifact locally, without publishing"
 run = "goreleaser release --snapshot --clean"
 
+[tasks."generate:go"]
+description = "Generate the Go parser from gh-tmpl.usage.kdl"
+run = "usage generate go -f gh-tmpl.usage.kdl -o internal/spec/spec.go -p spec"
+
+[tasks."generate:docs"]
+description = "Generate the command reference and the man page from gh-tmpl.usage.kdl"
+run = [
+  "rm -rf docs/reference",
+  "usage generate markdown --multi --indented-blocks-to-code-fences --out-dir docs/reference -f gh-tmpl.usage.kdl",
+  "mkdir -p man",
+  "usage generate manpage -f gh-tmpl.usage.kdl -o man/gh-tmpl.1",
+]
+
+[tasks."generate:completions"]
+description = "Generate the shell completion scripts from the generated parser"
+depends = ["generate:go"]
+run = [
+  "mkdir -p completions",
+  "go run . completion bash > completions/gh-tmpl.bash",
+  "go run . completion zsh > completions/_gh-tmpl",
+  "go run . completion fish > completions/gh-tmpl.fish",
+  "go run . completion nu > completions/gh-tmpl.nu",
+  "go run . completion powershell > completions/gh-tmpl.ps1",
+]
+
+[tasks.generate]
+description = "Regenerate everything that comes from gh-tmpl.usage.kdl"
+depends = ["generate:go", "generate:docs", "generate:completions"]
+
+[tasks."generate:check"]
+description = "Fail if regenerating from gh-tmpl.usage.kdl changes any file"
+depends = ["generate"]
+run = """
+paths="gh-tmpl.usage.kdl internal/spec docs/reference man completions"
+untracked=$(git ls-files --others --exclude-standard -- $paths)
+if ! git --no-pager diff --exit-code -- $paths || [ -n "$untracked" ]; then
+  echo "Generated files are out of date. Run 'mise run generate' and commit the result."
+  [ -n "$untracked" ] && echo "New files: $untracked"
+  exit 1
+fi
+"""
+
 [tasks.check]
 description = "Run every check that CI runs"
-depends = ["test", "lint", "vuln", "lint:actions", "release:check"]
+depends = ["test", "lint", "vuln", "lint:actions", "release:check", "generate:check"]
 
 [tasks.install-local]
 description = "Build the extension and install it into gh from this folder, which must be named gh-tmpl"

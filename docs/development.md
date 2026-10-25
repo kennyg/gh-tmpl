@@ -10,7 +10,7 @@ mise install
 hk install
 ```
 
-`mise install` installs the versions in `mise.toml`: Go, golangci-lint, GoReleaser, govulncheck, hk, pkl, actionlint, zizmor and typos. `hk install` adds the git hooks.
+`mise install` installs the versions in `mise.toml`: Go, golangci-lint, GoReleaser, govulncheck, hk, pkl, actionlint, zizmor, typos and usage. `hk install` adds the git hooks.
 
 ## Tasks
 
@@ -24,7 +24,9 @@ hk install
 | `mise run lint:actions` | actionlint and zizmor on `.github/` |
 | `mise run release:check` | `goreleaser check` |
 | `mise run release:snapshot` | Builds every release binary into `dist/` without publishing |
-| `mise run check` | test, lint, vuln, lint:actions and release:check |
+| `mise run generate` | Regenerates the parser, the command reference, the man page and the completions from `gh-tmpl.usage.kdl` |
+| `mise run generate:check` | Fails if `mise run generate` would change a file |
+| `mise run check` | test, lint, vuln, lint:actions, release:check and generate:check |
 | `mise run install-local` | Builds the binary and runs `gh extension install .` |
 
 ## Git hooks
@@ -47,12 +49,30 @@ gh tmpl --version
 
 `gh extension install .` needs the folder name to start with `gh-`, so run it from a clone in a folder named `gh-tmpl`. The version is `dev` for a local build. To remove the local install, run `gh extension remove tmpl`.
 
+## The command line spec
+
+[`gh-tmpl.usage.kdl`](../gh-tmpl.usage.kdl) defines every command, flag and argument once, in the [usage](https://usage.jdx.dev) spec format. Four outputs come from it:
+
+| Output | Made by | Path |
+| --- | --- | --- |
+| The Go parser, help text and completion tables | `usage generate go` | `internal/spec/spec.go` |
+| The command reference | `usage generate markdown` | `docs/reference/` |
+| The man page | `usage generate manpage` | `man/gh-tmpl.1` |
+| Shell completion scripts | `gh-tmpl completion <shell>`, which reads the generated tables | `completions/` |
+
+To change the command line, edit the spec, run `mise run generate`, and commit the spec with the generated files. Do not edit generated files by hand. CI runs `mise run generate:check`, which fails if the generated files do not match the spec.
+
+The usage Go framework is a development preview, and its APIs can change. `mise.toml` pins the usage CLI to 7.1.2. `go.mod` pins `github.com/jdx/usage/go` to the pseudo-version of the same release commit, because the Go module has no version tags of its own. Update both together, then run `mise run generate`.
+
+The generated parser does not enforce `subcommand_required`. The dispatcher in `internal/cli/cli.go` handles `gh tmpl pr` and `gh tmpl issue` without `create`.
+
 ## Code layout
 
 | Package | Job |
 | --- | --- |
 | `main.go` | Entry point. Sets the version. |
-| `internal/cli` | Commands, flags, output, and the call to `gh` |
+| `internal/spec` | Generated parser tables. Do not edit. |
+| `internal/cli` | Dispatch on the parsed command line, output, and the call to `gh` |
 | `internal/discover` | Template search, the local and API file readers, front matter |
 | `internal/form` | Issue form parsing and conversion to Markdown |
 | `internal/check` | The Markdown scanner and the check rules |

@@ -6,6 +6,7 @@ toolchain go1.27.3
 
 require (
 	github.com/cli/go-gh/v2 v2.17.0
+	github.com/jdx/usage/go v0.0.0-20261024100129-ad1549d987d4
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -19,6 +20,7 @@ require (
 	github.com/cli/shurcooL-graphql v0.0.4 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
+	github.com/expr-lang/expr v1.17.8 // indirect
 	github.com/henvic/httpretty v0.2.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect

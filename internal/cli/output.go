@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"strings"
@@ -135,50 +134,11 @@ func sourceLabel(res discover.Result) string {
 	return safeText(res.Source)
 }
 
-// parseArgs parses flags that can come before or after the positional
-// arguments, as in "gh tmpl check --body-file b.md pr --name x".
-func parseArgs(fs *flag.FlagSet, args []string) ([]string, error) {
-	var pos []string
-	for {
-		if err := fs.Parse(args); err != nil {
-			return nil, err
-		}
-		rest := fs.Args()
-		if len(rest) == 0 {
-			return pos, nil
-		}
-		pos = append(pos, rest[0])
-		args = rest[1:]
+// kindOf converts the kind argument, which the parser has already checked
+// against the choices pr and issue.
+func kindOf(s string) discover.Kind {
+	if s == string(discover.Issue) {
+		return discover.Issue
 	}
-}
-
-func newFlagSet(env *Env, name, help string) *flag.FlagSet {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
-	fs.SetOutput(env.Stderr)
-	fs.Usage = func() {
-		fmt.Fprint(fs.Output(), help)
-		fmt.Fprintln(fs.Output(), "\nFlags:")
-		fs.PrintDefaults()
-	}
-	return fs
-}
-
-// flagExit maps a flag parsing error to an exit code. The flag package has
-// printed the message already.
-func flagExit(err error) int {
-	if errors.Is(err, flag.ErrHelp) {
-		return ExitOK
-	}
-	return ExitUsage
-}
-
-// kindArg reads the optional pr or issue argument.
-func kindArg(pos []string) (discover.Kind, error) {
-	switch len(pos) {
-	case 0:
-		return discover.PR, nil
-	case 1:
-		return discover.ParseKind(pos[0])
-	}
-	return "", fmt.Errorf("unexpected arguments: %s", strings.Join(pos[1:], " "))
+	return discover.PR
 }

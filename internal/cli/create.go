@@ -11,28 +11,6 @@ import (
 	"github.com/kennyg/gh-tmpl/internal/discover"
 )
 
-const createHelp = `Check the body against the template, then run "gh %[1]s create".
-
-Usage:
-  gh tmpl %[1]s create [gh %[1]s create flags] [gh-tmpl flags]
-
-gh-tmpl reads the body from --body or --body-file, checks it, and stops with
-exit code 1 if the check fails. If the body passes, it runs
-"gh %[1]s create" with every flag except the gh-tmpl flags below. Without
---body or --body-file there is no body to check, so it runs gh directly.
-
-gh-tmpl flags:
-  --tmpl-name <template>   check against the template with this ID or name
-  --tmpl-strict            fail on warnings too
-  --tmpl-allow-unchecked   report an untouched checklist as a warning
-  --tmpl-offline           do not read the owner's shared .github repository
-  --tmpl-skip              run gh without the check
-
-Examples:
-  gh tmpl pr create --title "Fix login" --body-file body.md
-  gh tmpl issue create --tmpl-name bug_report --title "Crash" --body-file body.md
-`
-
 // ghFlags lists the flags of "gh pr create" and "gh issue create" that take
 // a value, so the scanner does not read a value as a flag. The map value is
 // the short form, or "" if there is none.
@@ -49,20 +27,23 @@ var ghFlags = map[discover.Kind]map[string]string{
 	},
 }
 
-// createArgs is the result of scanning the create arguments.
+// createOpts holds the --tmpl-* flags, which the generated parser reads.
+type createOpts struct {
+	checkOpts
+	offline bool
+	skip    bool
+}
+
+// createArgs is what scanCreate finds in the gh arguments.
 type createArgs struct {
-	pass     []string // arguments for gh
 	body     *string
 	bodyFile string
 	repo     string
-	opts     checkOpts
-	offline  bool
-	skip     bool
-	help     bool
 }
 
-// scanCreate splits the arguments into gh-tmpl flags and gh flags. It reads
-// the body, body file and repository flags but leaves them in place for gh.
+// scanCreate reads the body, body file and repository flags from the
+// arguments for gh. It does not change the arguments. The generated parser
+// has already removed the --tmpl-* flags.
 func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 	var c createArgs
 	valued := ghFlags[kind]
@@ -86,39 +67,7 @@ func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 
 	for i := 0; i < len(args); i++ {
 		a := args[i]
-		if a == "--" {
-			c.pass = append(c.pass, args[i:]...)
-			break
-		}
-		if strings.HasPrefix(a, "--tmpl-") {
-			name, value, hasValue := strings.Cut(strings.TrimPrefix(a, "--tmpl-"), "=")
-			switch name {
-			case "name":
-				if !hasValue {
-					if i+1 >= len(args) {
-						return c, errors.New("--tmpl-name needs a value")
-					}
-					i++
-					value = args[i]
-				}
-				c.opts.name = value
-			case "strict":
-				c.opts.strict = true
-			case "allow-unchecked":
-				c.opts.allowUnchecked = true
-			case "offline":
-				c.offline = true
-			case "skip":
-				c.skip = true
-			default:
-				return c, fmt.Errorf("unknown flag %s", a)
-			}
-			continue
-		}
-		c.pass = append(c.pass, a)
 		switch {
-		case a == "-h" || a == "--help":
-			c.help = true
 		case strings.HasPrefix(a, "--"):
 			name, value, hasValue := strings.Cut(a[2:], "=")
 			if _, ok := valued[name]; !ok {
@@ -130,7 +79,6 @@ func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 				}
 				i++
 				value = args[i]
-				c.pass = append(c.pass, value)
 			}
 			record(name, value)
 		case strings.HasPrefix(a, "-") && len(a) > 1:
@@ -149,7 +97,6 @@ func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 					}
 					i++
 					value = args[i]
-					c.pass = append(c.pass, value)
 				}
 				record(long, value)
 				break
@@ -159,26 +106,19 @@ func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 	return c, nil
 }
 
-func runCreate(ctx context.Context, env *Env, kind discover.Kind, args []string) int {
-	sub := "pr"
-	if kind == discover.Issue {
-		sub = "issue"
-	}
+func runCreate(ctx context.Context, env *Env, kind discover.Kind, args []string, o createOpts) int {
+	sub := string(kind)
 	c, err := scanCreate(kind, args)
 	if err != nil {
 		warnf(env, "%v", err)
 		return ExitUsage
 	}
-	ghArgs := append([]string{sub, "create"}, c.pass...)
-	if c.help {
-		fmt.Fprintf(env.Stdout, createHelp+"\nThe gh %s create help follows.\n\n", sub, sub)
-		return env.gh(ctx, ghArgs, env.Stdin)
-	}
+	ghArgs := append([]string{sub, "create"}, args...)
 
 	stdin := env.Stdin
 	var body string
 	switch {
-	case c.skip:
+	case o.skip:
 		return env.gh(ctx, ghArgs, stdin)
 	case c.bodyFile != "":
 		data, err := readBody(env, c.bodyFile)
@@ -198,17 +138,17 @@ func runCreate(ctx context.Context, env *Env, kind discover.Kind, args []string)
 		return env.gh(ctx, ghArgs, stdin)
 	}
 
-	t, res, err := env.pick(ctx, kind, lookup{repo: c.repo, offline: c.offline}, c.opts.name)
+	t, res, err := env.pick(ctx, kind, lookup{repo: c.repo, offline: o.offline}, o.name)
 	switch {
 	case errors.Is(err, discover.ErrNone):
 		warnf(env, "no %s template found; running gh %s create without a check", kindLabel(kind), sub)
 		return env.gh(ctx, ghArgs, stdin)
 	case err != nil:
-		warnf(env, "%s", selectErrorOrPlain(env, res, err, "--tmpl-name", c.opts.name))
+		warnf(env, "%s", selectErrorOrPlain(env, res, err, "--tmpl-name", o.name))
 		return ExitUsage
 	}
 
-	rep := runChecks(t, body, c.opts.options())
+	rep := runChecks(t, body, o.options())
 	if !rep.OK {
 		// gh prints the new URL on standard output, so the report goes to
 		// standard error.

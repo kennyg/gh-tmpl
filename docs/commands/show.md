@@ -10,17 +10,12 @@ The kind is `pr` or `issue`. It defaults to `pr`.
 
 ## Flags
 
-| Flag | Meaning |
-| --- | --- |
-| `--name <template>` | Pick a template by ID, file name, path, or the `name` in its front matter or form. Case does not matter. |
-| `--form <name>` | Pick an issue form and print it as Markdown. Implies `issue`. Fails for a Markdown template. |
-| `--list` | List the templates and exit 0. |
-| `--raw` | Print the file as it is, with front matter or YAML. |
-| `--json` | Print JSON instead of text. |
-| `-R`, `--repo <[HOST/]OWNER/REPO>` | Read the templates of another repository through the API. |
-| `--offline` | Do not read the owner's shared `.github` repository. |
+[The generated reference for `gh tmpl show`](../reference/show.md) lists every flag. These need more words:
 
-The ID of a template is its file name without the extension. For `.github/ISSUE_TEMPLATE/bug_report.yml`, the ID is `bug_report`.
+- `--name` picks a template by ID, file name, path, or the `name` in its front matter or form. Case does not matter.
+- `--form` picks an issue form and prints it as Markdown. It implies `issue`, and it fails for a Markdown template or with `pr`.
+- `--repo` reads the templates of another repository through the API. See [Enterprise hosts](../enterprise.md) for the host rules.
+- `--offline` skips the owner's shared `.github` repository.
 
 ## Pick a template
 

@@ -20,7 +20,7 @@ gh-tmpl uses the `gh` binary that runs the extension. It reads the `GH_PATH` var
 
 ## gh-tmpl flags
 
-The gh-tmpl flags start with `--tmpl-`, so they cannot clash with a `gh` flag.
+The gh-tmpl flags start with `--tmpl-`, so they cannot clash with a `gh` flag. The generated reference lists them for [`gh tmpl pr create`](../reference/pr/create.md) and [`gh tmpl issue create`](../reference/issue/create.md).
 
 | Flag | Meaning |
 | --- | --- |
@@ -29,6 +29,8 @@ The gh-tmpl flags start with `--tmpl-`, so they cannot clash with a `gh` flag.
 | `--tmpl-allow-unchecked` | Report an untouched checklist as a warning, not an error. |
 | `--tmpl-offline` | Do not read the owner's shared `.github` repository. |
 | `--tmpl-skip` | Run `gh` without the check. |
+
+`-h` and `--help` show the gh-tmpl help for the command. Run `gh pr create --help` for the `gh` flags.
 
 ## When gh-tmpl does not check
 
@@ -59,4 +61,8 @@ gh tmpl pr create --tmpl-strict --title "Docs" --body-file body.md
 
 ## Limits
 
-gh-tmpl knows which `gh pr create` and `gh issue create` flags take a value. It needs that list to find the body in the arguments. If a new `gh` release adds a flag that takes a value, write it as `--flag=value`. gh-tmpl then passes it through unchanged.
+The parser removes a bare `--` before it passes the arguments on. `gh pr create` and `gh issue create` take no positional arguments, so `--` has no effect on them.
+
+A value that is spelled like a gh-tmpl flag, as in `--title --tmpl-skip`, is read as the gh-tmpl flag. Write it as `--title=--tmpl-skip`.
+
+gh-tmpl knows which `gh pr create` and `gh issue create` flags take a value. It needs that list to find the body in the arguments. If a new `gh` release adds a flag that takes a value, write it as `--flag=value`. gh-tmpl then passes it through unchanged. A test compares the list with the `--help` output of the installed `gh`, so CI notices a new flag.

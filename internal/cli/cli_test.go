@@ -10,7 +10,9 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -497,20 +499,17 @@ func TestScanCreate(t *testing.T) {
 		name     string
 		kind     discover.Kind
 		args     []string
-		pass     string
 		body     string
 		bodyFile string
 		repo     string
-		tmpl     string
 	}{
-		{name: "long flags", kind: discover.PR, args: []string{"--title", "--body", "--body-file=b.md"}, pass: "--title --body --body-file=b.md", bodyFile: "b.md"},
-		{name: "short cluster", kind: discover.PR, args: []string{"-dwF", "b.md"}, pass: "-dwF b.md", bodyFile: "b.md"},
-		{name: "attached value", kind: discover.PR, args: []string{"-Fb.md", "-R=o/r"}, pass: "-Fb.md -R=o/r", bodyFile: "b.md", repo: "o/r"},
-		{name: "body text", kind: discover.Issue, args: []string{"-b", "-F looks like a flag"}, pass: "-b -F looks like a flag", body: "-F looks like a flag"},
-		{name: "tmpl flags removed", kind: discover.Issue, args: []string{"--tmpl-name", "bug", "-t", "x", "--tmpl-offline"}, pass: "-t x", tmpl: "bug"},
-		{name: "tmpl name with equals", kind: discover.PR, args: []string{"--tmpl-name=feature"}, tmpl: "feature"},
-		{name: "after --", kind: discover.PR, args: []string{"--", "--tmpl-name", "x"}, pass: "-- --tmpl-name x"},
-		{name: "unknown flags pass through", kind: discover.PR, args: []string{"--future-flag", "-z"}, pass: "--future-flag -z"},
+		{name: "long flags", kind: discover.PR, args: []string{"--title", "--body", "--body-file=b.md"}, bodyFile: "b.md"},
+		{name: "short cluster", kind: discover.PR, args: []string{"-dwF", "b.md"}, bodyFile: "b.md"},
+		{name: "attached value", kind: discover.PR, args: []string{"-Fb.md", "-R=o/r"}, bodyFile: "b.md", repo: "o/r"},
+		{name: "body text", kind: discover.Issue, args: []string{"-b", "-F looks like a flag"}, body: "-F looks like a flag"},
+		{name: "a value that looks like a flag", kind: discover.Issue, args: []string{"--attach", "--body-file", "--title", "t"}},
+		{name: "issue relation flags", kind: discover.Issue, args: []string{"--parent", "-F", "--blocked-by", "-F", "--blocking", "-b"}},
+		{name: "unknown flags", kind: discover.PR, args: []string{"--future-flag", "-z"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -518,22 +517,119 @@ func TestScanCreate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := strings.Join(c.pass, " "); got != tt.pass {
-				t.Errorf("pass = %q, want %q", got, tt.pass)
-			}
 			body := ""
 			if c.body != nil {
 				body = *c.body
 			}
-			if body != tt.body || c.bodyFile != tt.bodyFile || c.repo != tt.repo || c.opts.name != tt.tmpl {
-				t.Errorf("got body %q, file %q, repo %q, name %q", body, c.bodyFile, c.repo, c.opts.name)
+			if body != tt.body || c.bodyFile != tt.bodyFile || c.repo != tt.repo {
+				t.Errorf("got body %q, file %q, repo %q", body, c.bodyFile, c.repo)
 			}
 		})
 	}
-	for _, bad := range [][]string{{"--tmpl-name"}, {"--tmpl-bogus"}, {"--title"}, {"-F"}} {
+	for _, bad := range [][]string{{"--title"}, {"-F"}} {
 		if _, err := scanCreate(discover.PR, bad); err == nil {
 			t.Errorf("scanCreate(%q) returned no error", bad)
 		}
+	}
+}
+
+// TestCreatePassesArgumentsInOrder runs the create commands through the
+// generated parser. It checks that the --tmpl-* flags are removed and that
+// everything else reaches gh unchanged and in order.
+func TestCreatePassesArgumentsInOrder(t *testing.T) {
+	h := newHarness(t, "pr-multi")
+	body := h.write(t, "b.md", "## Feature\n\nDark mode.\n")
+	code := h.run("pr", "create", "--title", "help", "--tmpl-name", "feature", "-dF", body, "--tmpl-offline", "--base=main", "-l", "-x")
+	if code != ExitOK || len(h.calls) != 1 {
+		t.Fatalf("exit %d, calls %v\n%s", code, h.calls, h.stderr)
+	}
+	want := []string{"pr", "create", "--title", "help", "-dF", body, "--base=main", "-l", "-x"}
+	if got := h.calls[0].args; strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Errorf("args = %q, want %q", got, want)
+	}
+
+	h.calls = nil
+	if code := h.run("pr", "create", "--tmpl-name=bugfix", "--body-file", body, "--tmpl-offline"); code != ExitFailed || len(h.calls) != 0 {
+		t.Errorf("--tmpl-name=bugfix: exit %d, calls %v", code, h.calls)
+	}
+}
+
+// ghValueFlags reads the flags that take a value from "gh <sub> create
+// --help". A flag that takes a value has a placeholder after its name.
+func ghValueFlags(t *testing.T, sub string) map[string]bool {
+	t.Helper()
+	ghPath, err := exec.LookPath("gh")
+	if err != nil {
+		t.Skip("gh is not installed")
+	}
+	cmd := exec.Command(ghPath, sub, "create", "--help")
+	cmd.Env = append(os.Environ(), "GH_PROMPT_DISABLED=1", "NO_COLOR=1")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Skipf("gh %s create --help failed: %v", sub, err)
+	}
+	flags := map[string]bool{}
+	re := regexp.MustCompile(`^\s+(?:-[A-Za-z], )?--([a-z][a-z-]*) [^\s-]`)
+	section := ""
+	for _, line := range strings.Split(string(out), "\n") {
+		if line != "" && line[0] != ' ' {
+			section = line
+			continue
+		}
+		if section != "FLAGS" && section != "INHERITED FLAGS" {
+			continue
+		}
+		if m := re.FindStringSubmatch(line); m != nil {
+			flags[m[1]] = true
+		}
+	}
+	if len(flags) == 0 {
+		t.Skipf("could not read the flags of gh %s create", sub)
+	}
+	return flags
+}
+
+// TestGhFlagsMatchGhHelp compares the ghFlags table with the gh that is
+// installed. A new gh flag that takes a value must be added to ghFlags, or
+// a value after it that starts with "-" is read as a flag.
+func TestGhFlagsMatchGhHelp(t *testing.T) {
+	for kind, sub := range map[discover.Kind]string{discover.PR: "pr", discover.Issue: "issue"} {
+		t.Run(sub, func(t *testing.T) {
+			want := ghValueFlags(t, sub)
+			for name := range want {
+				if _, ok := ghFlags[kind][name]; !ok {
+					t.Errorf("gh %s create --%s takes a value, but ghFlags does not list it", sub, name)
+				}
+			}
+			for name := range ghFlags[kind] {
+				if !want[name] {
+					t.Errorf("ghFlags lists --%s, but gh %s create --help does not show it taking a value", name, sub)
+				}
+			}
+		})
+	}
+}
+
+func TestCompletion(t *testing.T) {
+	h := newHarness(t, "")
+	for _, shell := range []string{"bash", "zsh", "fish", "nu", "powershell"} {
+		if code := h.run("completion", shell); code != ExitOK || !strings.Contains(h.stdout.String(), "__complete_word__") {
+			t.Errorf("%s: exit %d, script %q", shell, code, h.stdout)
+		}
+	}
+	if code := h.run("completion", "tcsh"); code != ExitUsage {
+		t.Errorf("tcsh: exit %d", code)
+	}
+
+	// The script calls the binary back with the line typed so far.
+	if code := h.run("__complete_word__", "--shell", "bash", "--line", "gh-tmpl sh"); code != ExitOK || strings.TrimSpace(h.stdout.String()) != "show" {
+		t.Errorf("complete subcommand: exit %d, out %q", code, h.stdout)
+	}
+	if code := h.run("__complete_word__", "--shell", "bash", "--line", "gh-tmpl check --t"); code != ExitOK || !strings.Contains(h.stdout.String(), "--template-file") {
+		t.Errorf("complete flag: exit %d, out %q", code, h.stdout)
+	}
+	if code := h.run("__complete_word__", "--shell", "bash", "--line", "gh-tmpl show i"); code != ExitOK || strings.TrimSpace(h.stdout.String()) != "issue" {
+		t.Errorf("complete kind: exit %d, out %q", code, h.stdout)
 	}
 }
 

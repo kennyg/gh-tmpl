@@ -1,0 +1,137 @@
+// The command line of gh-tmpl. This file is the one source for the parser
+// (internal/spec/spec.go), the reference docs (docs/reference/), the man
+// page (man/gh-tmpl.1) and, through the parser, the shell completions
+// (completions/).
+// After a change, run "mise run generate" and commit the result.
+
+name "gh-tmpl"
+bin "gh-tmpl"
+version "0.0.0"
+author "Kenny Gatdula"
+license "MIT"
+repository "https://github.com/kennyg/gh-tmpl"
+about "Write and check issue and pull request bodies against a repository's templates"
+long_about #"""
+gh-tmpl finds a repository's pull request and issue templates, prints them for
+you to fill in, and checks a body against them before gh creates anything.
+
+It runs as a GitHub CLI extension: gh tmpl <command>.
+"""#
+unknown_flags "error"
+
+example "gh tmpl show pr > body.md" header="Print the pull request template"
+example "gh tmpl check --body-file body.md" header="Check a body"
+example "gh tmpl pr create --title \"Fix\" --body-file body.md" header="Check, then create a pull request"
+
+cmd "show" help="Print a template, or list the templates when there are several" {
+    long_help #"""
+Print a pull request or issue template.
+
+The kind defaults to pr. With several templates and no --name, the command
+lists them and exits 2. A pull request uses the single-file template, such as
+.github/pull_request_template.md, when there is one.
+
+An issue form (.yml) prints as Markdown sections that match the body GitHub
+writes for a submitted form. Use --raw to print the YAML.
+"""#
+    example "gh tmpl show pr > body.md"
+    example "gh tmpl show issue --list"
+    example "gh tmpl show issue --form bug_report > body.md"
+    example "gh tmpl show issue --name feature_request --json"
+    arg "[kind]" help="The template kind: pr (the default) or issue" {
+        choices "pr" "issue"
+    }
+    flag "--name <template>" help="Pick the template with this ID, file name or name"
+    flag "--form <name>" help="Pick the issue form with this ID and print it as Markdown" conflicts="--name"
+    flag "--raw" help="Print the file as it is, front matter or YAML included"
+    flag "--json" help="Print JSON"
+    flag "--list" help="List the templates"
+    flag "-R --repo <repo>" help="Read the templates of [HOST/]OWNER/REPO through the API"
+    flag "--offline" help="Do not read the owner's shared .github repository"
+}
+
+cmd "check" help="Check a body against a template. Exits 1 if the body fails" {
+    long_help #"""
+Check an issue or pull request body against its template.
+
+The kind defaults to pr. Use "--body-file -" to read the body from standard
+input. The check reports missing headings, empty sections, template comments
+left in the body, and checklists that nobody touched.
+
+Exit codes:
+
+    0  the body passes, or the repository has no template of this kind
+    1  the body fails the check
+    2  bad arguments, or no single template to check against
+"""#
+    example "gh tmpl check --body-file body.md"
+    example "gh tmpl check issue --name bug_report --body-file body.md --json"
+    example "git log -1 --format=%b | gh tmpl check --body-file -"
+    arg "[kind]" help="The template kind: pr (the default) or issue" {
+        choices "pr" "issue"
+    }
+    flag "-F --body-file <file>" help="Read the body from this file (use - for standard input)" conflicts="--body"
+    flag "-b --body <text>" help="The body text"
+    flag "--name <template>" help="Check against the template with this ID, file name or name"
+    flag "--template-file <file>" help="Check against this template file instead of discovering one"
+    flag "--strict" help="Fail on warnings too"
+    flag "--allow-unchecked" help="Report an untouched checklist as a warning, not an error"
+    flag "--json" help="Print the report as JSON"
+    flag "-R --repo <repo>" help="Read the templates of [HOST/]OWNER/REPO through the API"
+    flag "--offline" help="Do not read the owner's shared .github repository"
+}
+
+cmd "pr" help="Check the body, then run \"gh pr create\" with the other flags" subcommand_required=#true {
+    cmd "create" help="Check the body, then run \"gh pr create\"" unknown_flags="value" {
+        long_help #"""
+Check the body against the pull request template, then run "gh pr create".
+
+gh-tmpl reads the body from --body, -b, --body-file or -F, checks it, and
+stops with exit code 1 if the check fails. If the body passes, it runs
+"gh pr create" with every argument except the --tmpl-* flags. Without
+--body or --body-file there is no body to check, so it runs gh directly.
+"""#
+        example "gh tmpl pr create --title \"Fix the login loop\" --body-file body.md"
+        example "gh tmpl pr create -t Fix -F - < body.md"
+        flag "--tmpl-name <template>" help="Check against the template with this ID or name"
+        flag "--tmpl-strict" help="Fail on warnings too"
+        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error"
+        flag "--tmpl-offline" help="Do not read the owner's shared .github repository"
+        flag "--tmpl-skip" help="Run gh without the check"
+        arg "[gh_args]..." help="Arguments for gh pr create, passed on in order"
+    }
+}
+
+cmd "issue" help="Check the body, then run \"gh issue create\" with the other flags" subcommand_required=#true {
+    cmd "create" help="Check the body, then run \"gh issue create\"" unknown_flags="value" {
+        long_help #"""
+Check the body against the issue template, then run "gh issue create".
+
+gh-tmpl reads the body from --body, -b, --body-file or -F, checks it, and
+stops with exit code 1 if the check fails. If the body passes, it runs
+"gh issue create" with every argument except the --tmpl-* flags. Without
+--body or --body-file there is no body to check, so it runs gh directly.
+"""#
+        example "gh tmpl issue create --tmpl-name bug_report --title \"Crash\" --body-file body.md"
+        flag "--tmpl-name <template>" help="Check against the template with this ID or name"
+        flag "--tmpl-strict" help="Fail on warnings too"
+        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error"
+        flag "--tmpl-offline" help="Do not read the owner's shared .github repository"
+        flag "--tmpl-skip" help="Run gh without the check"
+        arg "[gh_args]..." help="Arguments for gh issue create, passed on in order"
+    }
+}
+
+cmd "completion" help="Print a shell completion script for gh-tmpl" {
+    long_help #"""
+Print a shell completion script for the gh-tmpl binary.
+
+gh does not complete the commands of extensions, so the script completes
+gh-tmpl when the binary is on your PATH. The binary answers each completion
+request itself; the script needs no other tool.
+"""#
+    example "gh-tmpl completion zsh > ~/.zfunc/_gh-tmpl"
+    arg "<shell>" help="The shell" {
+        choices "bash" "zsh" "fish" "nu" "powershell"
+    }
+}

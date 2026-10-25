@@ -60,6 +60,7 @@ gh tmpl issue create --tmpl-name bug_report --title "Crash on start" --body-file
 
 ## Documentation
 
+- [Command reference](docs/reference/index.md), generated from [`gh-tmpl.usage.kdl`](gh-tmpl.usage.kdl)
 - [Where gh-tmpl looks for templates](docs/template-discovery.md)
 - [How the check decides pass or fail](docs/check-rules.md)
 - [Issue form conversion](docs/issue-forms.md)
@@ -68,6 +69,18 @@ gh tmpl issue create --tmpl-name bug_report --title "Crash on start" --body-file
 - [Release process](docs/release.md)
 - [Development](docs/development.md)
 - [Security policy and design](SECURITY.md)
+
+## Shell completions and man page
+
+`gh` does not complete the commands of extensions. If you put the `gh-tmpl` binary on your `PATH`, you can complete `gh-tmpl` itself. Each release ships the scripts and a man page, and the binary prints the scripts:
+
+```sh
+gh-tmpl completion zsh > "${fpath[1]}/_gh-tmpl"
+gh-tmpl completion bash > ~/.local/share/bash-completion/completions/gh-tmpl
+gh-tmpl completion fish > ~/.config/fish/completions/gh-tmpl.fish
+```
+
+The binary answers each completion request from its own tables. The scripts need no other tool. The scripts are also in [`completions/`](completions), and the man page is [`man/gh-tmpl.1`](man/gh-tmpl.1).
 
 ## License
 
