@@ -63,6 +63,7 @@ gh tmpl issue create --tmpl-name bug_report --title "Crash on start" --body-file
 - [Command reference](docs/reference/index.md), generated from [`gh-tmpl.usage.kdl`](gh-tmpl.usage.kdl)
 - [Where gh-tmpl looks for templates](docs/template-discovery.md)
 - [How the check decides pass or fail](docs/check-rules.md)
+- [Proofs of the core rules](docs/verification.md), with Lean
 - [Issue form conversion](docs/issue-forms.md)
 - [Use with AI agents](docs/ai-agents.md), with an `AGENTS.md` and `CLAUDE.md` snippet
 - [GitHub Enterprise hosts](docs/enterprise.md)

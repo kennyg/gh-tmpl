@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -551,6 +552,37 @@ func TestCreatePassesArgumentsInOrder(t *testing.T) {
 	h.calls = nil
 	if code := h.run("pr", "create", "--tmpl-name=bugfix", "--body-file", body, "--tmpl-offline"); code != ExitFailed || len(h.calls) != 0 {
 		t.Errorf("--tmpl-name=bugfix: exit %d, calls %v", code, h.calls)
+	}
+}
+
+// TestCreateKeepsValuesSpelledLikeFlags checks that a value is never read as
+// a flag, and that "--" reaches gh.
+func TestCreateKeepsValuesSpelledLikeFlags(t *testing.T) {
+	h := newHarness(t, "empty")
+	code := h.run("pr", "create", "--title", "--tmpl-skip", "-b", "--", "--tmpl-offline", "--", "-x")
+	if code != ExitOK || len(h.calls) != 1 {
+		t.Fatalf("exit %d, calls %v\n%s", code, h.calls, h.stderr)
+	}
+	want := []string{"pr", "create", "--title", "--tmpl-skip", "-b", "--", "--", "-x"}
+	if got := h.calls[0].args; !slices.Equal(got, want) {
+		t.Errorf("args = %q, want %q", got, want)
+	}
+	if strings.Contains(h.stderr.String(), "no --body") {
+		t.Errorf("the body \"--\" was not found: %s", h.stderr)
+	}
+}
+
+// TestCreateTmplNameTakesDashValue checks that --tmpl-name takes the next
+// word even if it starts with "-".
+func TestCreateTmplNameTakesDashValue(t *testing.T) {
+	h := newHarness(t, "pr-multi")
+	body := h.write(t, "b.md", "## Feature\n\nDark mode.\n")
+	code := h.run("pr", "create", "--tmpl-name", "-b", "-F", body)
+	if code != ExitUsage || len(h.calls) != 0 {
+		t.Fatalf("exit %d, calls %v\n%s", code, h.calls, h.stderr)
+	}
+	if !strings.Contains(h.stderr.String(), `"-b"`) {
+		t.Errorf("stderr does not name the template -b:\n%s", h.stderr)
 	}
 }
 

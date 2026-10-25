@@ -109,6 +109,7 @@ func Run(ctx context.Context, env *Env, args []string) int {
 		fmt.Fprint(env.Stderr, argv.ShortHelp(helpMeta(env), []string{displayName}, []*argv.Command{spec.Root}, spec.HelpText))
 		return ExitUsage
 	}
+	args = splitCreateArgs(args)
 	cli, err := spec.Parse(args)
 	if err != nil {
 		var perr *argv.Error
@@ -164,6 +165,36 @@ func Run(ctx context.Context, env *Env, args []string) int {
 		return ExitOK
 	}
 	return ExitUsage
+}
+
+// splitCreateArgs prepares the arguments of "pr create" and "issue create"
+// for the generated parser. The parser would read a gh-tmpl flag anywhere,
+// even as the value of a gh flag, as in "--title --tmpl-skip", and it drops
+// a "--". So splitCreate sorts the words first, and the gh words go after a
+// "--", where the parser keeps every word as it is. The parser rejects a
+// separate value that starts with "-", so each gh-tmpl value is attached to
+// its flag, as in "--tmpl-name=-x".
+func splitCreateArgs(args []string) []string {
+	if len(args) < 2 || args[1] != "create" {
+		return args
+	}
+	kind := discover.Kind(args[0])
+	if kind != discover.PR && kind != discover.Issue {
+		return args
+	}
+	own, gh := splitCreate(kind, args[2:])
+	flags := ownFlags(kind)
+	out := []string{args[0], args[1]}
+	for i := 0; i < len(own); i++ {
+		if needsValue, _ := ownFlag(flags, own[i]); needsValue && i+1 < len(own) {
+			out = append(out, own[i]+"="+own[i+1])
+			i++
+			continue
+		}
+		out = append(out, own[i])
+	}
+	out = append(out, "--")
+	return append(out, gh...)
 }
 
 // missingSubcommand prints the help of a command that needs a subcommand.

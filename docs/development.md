@@ -29,6 +29,8 @@ hk install
 | `mise run generate` | Regenerates the parser, the command reference, the man page and the completions from `gh-tmpl.usage.kdl` |
 | `mise run generate:check` | Fails if `mise run generate` would change a file |
 | `mise run check` | test, lint, vuln, lint:actions, release:check and generate:check |
+| `mise run verify` | Checks the Lean proofs in `verify/` and writes the Lean test cases again. Needs elan. |
+| `mise run verify:check` | Fails if a proof fails or a Lean test case file is out of date, then runs the differential tests |
 | `mise run install-local` | Builds the binary and runs `gh extension install .` |
 
 ## Git hooks
@@ -100,6 +102,8 @@ The generated parser does not enforce `subcommand_required`. The dispatcher in `
 | `internal/discover` | Template search, the local and API file readers, front matter |
 | `internal/form` | Issue form parsing and conversion to Markdown |
 | `internal/check` | The Markdown scanner and the check rules |
+| `internal/leantest` | Reads the test cases that the Lean models write |
+| `verify/` | Lean models of the argument split, the check rules and the lookup order, with proofs. The Go build does not use it. |
 
 ## Tests
 
@@ -115,3 +119,5 @@ The form and check packages have fuzz tests:
 go test ./internal/form -fuzz FuzzParse -fuzztime 30s
 go test ./internal/check -fuzz FuzzMarkdown -fuzztime 30s
 ```
+
+The cli, check and discover packages have differential tests against the Lean models in `verify/`. The cases are in `testdata/lean/` in each package, and `go test` runs them without Lean. See [Proofs of the core rules](verification.md).

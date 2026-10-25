@@ -61,8 +61,6 @@ gh tmpl pr create --tmpl-strict --title "Docs" --body-file body.md
 
 ## Limits
 
-The parser removes a bare `--` before it passes the arguments on. `gh pr create` and `gh issue create` take no positional arguments, so `--` has no effect on them.
+A flag that takes a value takes the next word, whether gh-tmpl or `gh` owns the flag. So `--title --tmpl-skip` sets the title to `--tmpl-skip`, and `--tmpl-name -x` checks against the template named `-x`. gh-tmpl passes `--` and every word after it to `gh` unchanged. [Proofs of the core rules](../verification.md) has the proofs of these rules.
 
-A value that is spelled like a gh-tmpl flag, as in `--title --tmpl-skip`, is read as the gh-tmpl flag. Write it as `--title=--tmpl-skip`.
-
-gh-tmpl knows which `gh pr create` and `gh issue create` flags take a value. It needs that list to find the body in the arguments. If a new `gh` release adds a flag that takes a value, write it as `--flag=value`. gh-tmpl then passes it through unchanged. A test compares the list with the `--help` output of the installed `gh`, so CI notices a new flag.
+gh-tmpl knows which `gh pr create` and `gh issue create` flags take a value. It needs that list to find the body in the arguments. If a new `gh` release adds a flag that takes a value, write it as `--flag=value`. gh-tmpl then passes it through unchanged. Otherwise gh-tmpl reads its value as a separate word, and a value spelled like a gh-tmpl flag becomes that flag. A test compares the list with the `--help` output of the installed `gh`, so CI notices a new flag.

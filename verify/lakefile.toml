@@ -1,0 +1,13 @@
+name = "ghtmpl"
+version = "0.1.0"
+defaultTargets = ["GhTmpl", "corpus"]
+
+[leanOptions]
+autoImplicit = false
+
+[[lean_lib]]
+name = "GhTmpl"
+
+[[lean_exe]]
+name = "corpus"
+root = "Corpus"
