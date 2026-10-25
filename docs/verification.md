@@ -14,6 +14,10 @@ Each theorem is about the Lean model, not about the Go code.
 | Argument split | `splitCreate` | `valid_tokenize` | The tokens follow the grammar. A flag that takes a value, of gh-tmpl or of gh, takes the next word. A value is never read as a flag. |
 | Argument split | `splitCreate` | `tokenize_unique` | No other token list follows the grammar and holds the same words. |
 | Argument split | `splitCreate` | `split_interleave`, `split_keeps_words` | The gh-tmpl words and the gh words interleave to the input. Each side keeps the input order. |
+| Switches | `switchValues` and the generated parser | `switchWord_bare`, `switchWord_attached` | `--tmpl-skip` sets the switch to true. `--tmpl-skip=value` sets it to the value: true for `true` or `1`, false for `false` or `0`. |
+| Switches | `switchValues` | `boolValue_isSome`, `parses_bad_value` | Those four values are the only ones. Any other value is a usage error. |
+| Switches | `splitCreate` | `switchWord_own`, `tokenize_switch` | A switch word, with or without its value, is one gh-tmpl token and never takes the next word. |
+| Switches | The generated parser | `switchOn_last` | The last word that sets a switch wins, so `--tmpl-skip --tmpl-skip=false` leaves the check on. |
 | Check rules | `check.Markdown` | `pass_keeps_headings` | If the check passes, the body has each template heading at least as often as the template has it. |
 | Check rules | `check.Markdown` | `missing_heading_count` | The check reports one `missing-heading` finding for each heading that the body lacks. |
 | Check rules | `check.Markdown` | `pass_has_no_placeholder`, `placeholder_reported` | A pass means that no template comment is left. Each comment that is left is reported at its line. |
@@ -35,7 +39,7 @@ Some parts of the model have no theorems. The differential tests still compare t
 | Model | Go code | Not proved |
 | --- | --- | --- |
 | `Argv.scan` | `scanCreate` | Which body, body file and repository the scan finds in the gh words |
-| `Argv.parses`, `Argv.tmplName` | `Run` and the generated parser | Whether the parser accepts the gh-tmpl words, and which `--tmpl-name` it reads |
+| `Argv.parses`, `Argv.tmplName`, `Argv.switchOn` | `Run` and the generated parser | Whether the parser accepts the gh-tmpl words, which `--tmpl-name` it reads, and the value it binds to each switch |
 | `Check.headingPart` | `check.Markdown` | The `empty-section` and `unchanged-section` rules |
 | `Check.check` | `check.Markdown` | The order, sections and lines of the findings |
 | `Lookup.findIn` | `discover.FindIn` | The shadowed paths and the count of problems in one repository |
@@ -54,20 +58,16 @@ The third link is review. A person must read the model next to the Go code and j
 
 Some parts are outside the model completely:
 
-- The generated usage parser. The tests run it on every case, but no proof covers it. gh-tmpl gives it the gh words after a `--`, where it keeps every word. The parser rejects a separate value that starts with `-`, so gh-tmpl attaches each gh-tmpl value to its flag, as in `--tmpl-name=-x`.
+- The generated usage parser. The tests run it on every case, but no proof covers it. gh-tmpl gives it the gh words after a `--`, where it keeps every word. The parser rejects a separate value that starts with `-`, so gh-tmpl attaches each gh-tmpl value to its flag, as in `--tmpl-name=-x`. The parser reads only `true` and `false` after a switch, so `switchValues` changes `1` to `true` and `0` to `false` first. The switches of `show` and `check` have no model. Go tests cover them.
 - `gh` itself. The model assumes that `gh` reads a flag and its value the way the grammar says.
 - The file readers. The lookup model uses a repository in memory. It does not cover the API client, the file size limit or the limit of 100 templates per folder. In the model, every issue form fails to parse.
 - Text handling such as Unicode case folding. The cases use ASCII.
 
 ## Run the proofs
 
-Install [elan](https://github.com/leanprover/elan), the Lean version manager:
+`mise install` installs [elan](https://github.com/leanprover/elan), the Lean version manager, with the other tools. `mise.toml` pins the elan version.
 
-```sh
-brew install elan-init
-```
-
-The file `verify/lean-toolchain` pins the Lean version. elan downloads it on the first build. The model uses only the Lean core library, so the build takes a few seconds.
+The file `verify/lean-toolchain` pins the Lean version. elan downloads it into `~/.elan` on the first build. The model uses only the Lean core library, so the build takes a few seconds.
 
 | Task | What it runs |
 | --- | --- |

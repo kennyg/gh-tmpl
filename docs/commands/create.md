@@ -30,6 +30,8 @@ The gh-tmpl flags start with `--tmpl-`, so they cannot clash with a `gh` flag. T
 | `--tmpl-offline` | Do not read the owner's shared `.github` repository. |
 | `--tmpl-skip` | Run `gh` without the check. |
 
+Each flag in the table except `--tmpl-name` is a switch. A switch also takes an attached value. `--tmpl-skip=true` and `--tmpl-skip=1` turn it on. `--tmpl-skip=false` and `--tmpl-skip=0` turn it off. The last one wins, so `--tmpl-skip --tmpl-skip=false` runs the check. Any other value, such as `--tmpl-skip=yes`, is a usage error with exit code 2, and gh-tmpl does not run `gh`.
+
 `-h` and `--help` show the gh-tmpl help for the command. Run `gh pr create --help` for the `gh` flags.
 
 ## When gh-tmpl does not check

@@ -88,7 +88,13 @@ def table (kind : String) : Argv.Table := ⟨ownLongs, ghTable kind⟩
 def words : List String :=
   ["--title", "-t", "x", "--tmpl-skip", "--tmpl-name", "feat", "--tmpl-name=a", "--body",
    "-b", "-F", "--body-file=b.md", "-dF", "-Fb.md", "-db", "--", "-h", "--draft", "--repo",
-   "-R=o/r", "--tmpl-x", "-", "", "--type", "--parent", "-b=", "--body-file", "--tmpl-strict=1"]
+   "-R=o/r", "--tmpl-x", "-", "", "--type", "--parent", "-b=", "--body-file", "--tmpl-strict=1",
+   "--tmpl-skip=false", "--tmpl-skip=0", "--tmpl-offline=true", "--tmpl-skip=yes",
+   "--tmpl-allow-unchecked="]
+
+/-- The switches of `pr create` and `issue create`. -/
+def switches : List String :=
+  ownLongs.filterMap fun (n, v) => if !v && n != "help" then some n else none
 
 def argvCase (kind : String) (args : List String) : String :=
   let t := table kind
@@ -99,7 +105,8 @@ def argvCase (kind : String) (args : List String) : String :=
     | none => "null"
   jsonObj [("kind", jsonStr kind), ("args", jsonArr (args.map jsonStr)),
            ("own", jsonArr (own.map jsonStr)), ("gh", jsonArr (gh.map jsonStr)), ("scan", scan),
-           ("parses", jsonBool (Argv.parses t args)), ("tmplName", jsonOpt (Argv.tmplName t args))]
+           ("parses", jsonBool (Argv.parses t args)), ("tmplName", jsonOpt (Argv.tmplName t args)),
+           ("switches", jsonObj (switches.map fun n => (n, jsonBool (Argv.switchOn t n args))))]
 
 def tableLine (kind : String) : String :=
   jsonObj [("kind", jsonStr kind),

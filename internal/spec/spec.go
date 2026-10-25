@@ -75,11 +75,11 @@ var cmdShow = &argv.Command{
 	Flags: []*argv.Flag{
 		{Key: FlagShowName, Name: "name", Longs: []string{"name"}, TakesValue: true},
 		{Key: FlagShowForm, Name: "form", Longs: []string{"form"}, TakesValue: true},
-		{Key: FlagShowRaw, Name: "raw", Longs: []string{"raw"}},
-		{Key: FlagShowJson, Name: "json", Longs: []string{"json"}},
-		{Key: FlagShowList, Name: "list", Longs: []string{"list"}},
+		{Key: FlagShowRaw, Name: "raw", Longs: []string{"raw"}, BoolValue: true},
+		{Key: FlagShowJson, Name: "json", Longs: []string{"json"}, BoolValue: true},
+		{Key: FlagShowList, Name: "list", Longs: []string{"list"}, BoolValue: true},
 		{Key: FlagShowRepo, Name: "repo", Longs: []string{"repo"}, Shorts: []byte{'R'}, TakesValue: true},
-		{Key: FlagShowOffline, Name: "offline", Longs: []string{"offline"}},
+		{Key: FlagShowOffline, Name: "offline", Longs: []string{"offline"}, BoolValue: true},
 	},
 	Args: []*argv.Arg{
 		{Key: ArgShowKind, Name: "kind"},
@@ -96,11 +96,11 @@ var cmdCheck = &argv.Command{
 		{Key: FlagCheckBody, Name: "body", Longs: []string{"body"}, Shorts: []byte{'b'}, TakesValue: true},
 		{Key: FlagCheckName, Name: "name", Longs: []string{"name"}, TakesValue: true},
 		{Key: FlagCheckTemplateFile, Name: "template-file", Longs: []string{"template-file"}, TakesValue: true},
-		{Key: FlagCheckStrict, Name: "strict", Longs: []string{"strict"}},
-		{Key: FlagCheckAllowUnchecked, Name: "allow-unchecked", Longs: []string{"allow-unchecked"}},
-		{Key: FlagCheckJson, Name: "json", Longs: []string{"json"}},
+		{Key: FlagCheckStrict, Name: "strict", Longs: []string{"strict"}, BoolValue: true},
+		{Key: FlagCheckAllowUnchecked, Name: "allow-unchecked", Longs: []string{"allow-unchecked"}, BoolValue: true},
+		{Key: FlagCheckJson, Name: "json", Longs: []string{"json"}, BoolValue: true},
 		{Key: FlagCheckRepo, Name: "repo", Longs: []string{"repo"}, Shorts: []byte{'R'}, TakesValue: true},
-		{Key: FlagCheckOffline, Name: "offline", Longs: []string{"offline"}},
+		{Key: FlagCheckOffline, Name: "offline", Longs: []string{"offline"}, BoolValue: true},
 	},
 	Args: []*argv.Arg{
 		{Key: ArgCheckKind, Name: "kind"},
@@ -122,10 +122,10 @@ var cmdPrCreate = &argv.Command{
 	Key:  CmdPrCreate,
 	Flags: []*argv.Flag{
 		{Key: FlagPrCreateTmplName, Name: "tmpl-name", Longs: []string{"tmpl-name"}, TakesValue: true},
-		{Key: FlagPrCreateTmplStrict, Name: "tmpl-strict", Longs: []string{"tmpl-strict"}},
-		{Key: FlagPrCreateTmplAllowUnchecked, Name: "tmpl-allow-unchecked", Longs: []string{"tmpl-allow-unchecked"}},
-		{Key: FlagPrCreateTmplOffline, Name: "tmpl-offline", Longs: []string{"tmpl-offline"}},
-		{Key: FlagPrCreateTmplSkip, Name: "tmpl-skip", Longs: []string{"tmpl-skip"}},
+		{Key: FlagPrCreateTmplStrict, Name: "tmpl-strict", Longs: []string{"tmpl-strict"}, BoolValue: true},
+		{Key: FlagPrCreateTmplAllowUnchecked, Name: "tmpl-allow-unchecked", Longs: []string{"tmpl-allow-unchecked"}, BoolValue: true},
+		{Key: FlagPrCreateTmplOffline, Name: "tmpl-offline", Longs: []string{"tmpl-offline"}, BoolValue: true},
+		{Key: FlagPrCreateTmplSkip, Name: "tmpl-skip", Longs: []string{"tmpl-skip"}, BoolValue: true},
 	},
 	Args: []*argv.Arg{
 		{Key: ArgPrCreateGhArgs, Name: "gh_args", Var: true},
@@ -146,10 +146,10 @@ var cmdIssueCreate = &argv.Command{
 	Key:  CmdIssueCreate,
 	Flags: []*argv.Flag{
 		{Key: FlagIssueCreateTmplName, Name: "tmpl-name", Longs: []string{"tmpl-name"}, TakesValue: true},
-		{Key: FlagIssueCreateTmplStrict, Name: "tmpl-strict", Longs: []string{"tmpl-strict"}},
-		{Key: FlagIssueCreateTmplAllowUnchecked, Name: "tmpl-allow-unchecked", Longs: []string{"tmpl-allow-unchecked"}},
-		{Key: FlagIssueCreateTmplOffline, Name: "tmpl-offline", Longs: []string{"tmpl-offline"}},
-		{Key: FlagIssueCreateTmplSkip, Name: "tmpl-skip", Longs: []string{"tmpl-skip"}},
+		{Key: FlagIssueCreateTmplStrict, Name: "tmpl-strict", Longs: []string{"tmpl-strict"}, BoolValue: true},
+		{Key: FlagIssueCreateTmplAllowUnchecked, Name: "tmpl-allow-unchecked", Longs: []string{"tmpl-allow-unchecked"}, BoolValue: true},
+		{Key: FlagIssueCreateTmplOffline, Name: "tmpl-offline", Longs: []string{"tmpl-offline"}, BoolValue: true},
+		{Key: FlagIssueCreateTmplSkip, Name: "tmpl-skip", Longs: []string{"tmpl-skip"}, BoolValue: true},
 	},
 	Args: []*argv.Arg{
 		{Key: ArgIssueCreateGhArgs, Name: "gh_args", Var: true},
@@ -420,15 +420,31 @@ func Parse(args []string) (*Cli, error) {
 			case FlagShowForm:
 				cmdShowV.Form = ev.Value
 			case FlagShowRaw:
-				cmdShowV.Raw = !ev.Negated
+				if ev.HasValue {
+					cmdShowV.Raw = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdShowV.Raw = !ev.Negated
+				}
 			case FlagShowJson:
-				cmdShowV.Json = !ev.Negated
+				if ev.HasValue {
+					cmdShowV.Json = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdShowV.Json = !ev.Negated
+				}
 			case FlagShowList:
-				cmdShowV.List = !ev.Negated
+				if ev.HasValue {
+					cmdShowV.List = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdShowV.List = !ev.Negated
+				}
 			case FlagShowRepo:
 				cmdShowV.Repo = ev.Value
 			case FlagShowOffline:
-				cmdShowV.Offline = !ev.Negated
+				if ev.HasValue {
+					cmdShowV.Offline = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdShowV.Offline = !ev.Negated
+				}
 			case FlagCheckBodyFile:
 				cmdCheckV.BodyFile = ev.Value
 			case FlagCheckBody:
@@ -438,35 +454,83 @@ func Parse(args []string) (*Cli, error) {
 			case FlagCheckTemplateFile:
 				cmdCheckV.TemplateFile = ev.Value
 			case FlagCheckStrict:
-				cmdCheckV.Strict = !ev.Negated
+				if ev.HasValue {
+					cmdCheckV.Strict = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdCheckV.Strict = !ev.Negated
+				}
 			case FlagCheckAllowUnchecked:
-				cmdCheckV.AllowUnchecked = !ev.Negated
+				if ev.HasValue {
+					cmdCheckV.AllowUnchecked = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdCheckV.AllowUnchecked = !ev.Negated
+				}
 			case FlagCheckJson:
-				cmdCheckV.Json = !ev.Negated
+				if ev.HasValue {
+					cmdCheckV.Json = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdCheckV.Json = !ev.Negated
+				}
 			case FlagCheckRepo:
 				cmdCheckV.Repo = ev.Value
 			case FlagCheckOffline:
-				cmdCheckV.Offline = !ev.Negated
+				if ev.HasValue {
+					cmdCheckV.Offline = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdCheckV.Offline = !ev.Negated
+				}
 			case FlagPrCreateTmplName:
 				cmdPrCreateV.TmplName = ev.Value
 			case FlagPrCreateTmplStrict:
-				cmdPrCreateV.TmplStrict = !ev.Negated
+				if ev.HasValue {
+					cmdPrCreateV.TmplStrict = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdPrCreateV.TmplStrict = !ev.Negated
+				}
 			case FlagPrCreateTmplAllowUnchecked:
-				cmdPrCreateV.TmplAllowUnchecked = !ev.Negated
+				if ev.HasValue {
+					cmdPrCreateV.TmplAllowUnchecked = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdPrCreateV.TmplAllowUnchecked = !ev.Negated
+				}
 			case FlagPrCreateTmplOffline:
-				cmdPrCreateV.TmplOffline = !ev.Negated
+				if ev.HasValue {
+					cmdPrCreateV.TmplOffline = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdPrCreateV.TmplOffline = !ev.Negated
+				}
 			case FlagPrCreateTmplSkip:
-				cmdPrCreateV.TmplSkip = !ev.Negated
+				if ev.HasValue {
+					cmdPrCreateV.TmplSkip = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdPrCreateV.TmplSkip = !ev.Negated
+				}
 			case FlagIssueCreateTmplName:
 				cmdIssueCreateV.TmplName = ev.Value
 			case FlagIssueCreateTmplStrict:
-				cmdIssueCreateV.TmplStrict = !ev.Negated
+				if ev.HasValue {
+					cmdIssueCreateV.TmplStrict = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdIssueCreateV.TmplStrict = !ev.Negated
+				}
 			case FlagIssueCreateTmplAllowUnchecked:
-				cmdIssueCreateV.TmplAllowUnchecked = !ev.Negated
+				if ev.HasValue {
+					cmdIssueCreateV.TmplAllowUnchecked = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdIssueCreateV.TmplAllowUnchecked = !ev.Negated
+				}
 			case FlagIssueCreateTmplOffline:
-				cmdIssueCreateV.TmplOffline = !ev.Negated
+				if ev.HasValue {
+					cmdIssueCreateV.TmplOffline = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdIssueCreateV.TmplOffline = !ev.Negated
+				}
 			case FlagIssueCreateTmplSkip:
-				cmdIssueCreateV.TmplSkip = !ev.Negated
+				if ev.HasValue {
+					cmdIssueCreateV.TmplSkip = (ev.Value == "true") != ev.Negated
+				} else {
+					cmdIssueCreateV.TmplSkip = !ev.Negated
+				}
 			}
 		case argv.KindArg:
 			seen[ev.Arg.Key]++

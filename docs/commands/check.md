@@ -15,6 +15,7 @@ The kind is `pr` or `issue`. It defaults to `pr`.
 - `--body-file -` reads the body from standard input. `--body` and `--body-file` cannot be given together. An empty body is a usage error, exit 2.
 - `--template-file` checks against a template file on disk instead of discovering one. A `.yml` or `.yaml` file is an issue form.
 - `--strict` fails on warnings too. `--allow-unchecked` reports an untouched checklist as a warning, not an error.
+- `--strict`, `--allow-unchecked`, `--json` and `--offline` are switches. `=true` or `=1` turns a switch on, and `=false` or `=0` turns it off, as in `--strict=false`. The last one wins. Any other value is a usage error, exit 2.
 
 ## Text output
 

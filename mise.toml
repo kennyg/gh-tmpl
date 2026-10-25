@@ -9,6 +9,9 @@ actionlint = "1.7.12"
 zizmor = "1.31.1"
 typos = "1.51.1"
 usage = { version = "7.1.2", workflow = "publish-cli.yml" }
+# elan installs the Lean version in verify/lean-toolchain. The release has one
+# binary, elan-init, that acts as elan, lake or lean by the name it runs as.
+"github:leanprover/elan" = { version = "4.2.4", postinstall = 'for n in elan lake lean; do ln -sf elan-init "$MISE_TOOL_INSTALL_PATH/$n"; done' }
 
 [env]
 CGO_ENABLED = "0"

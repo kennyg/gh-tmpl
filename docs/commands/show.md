@@ -16,6 +16,7 @@ The kind is `pr` or `issue`. It defaults to `pr`.
 - `--form` picks an issue form and prints it as Markdown. It implies `issue`, and it fails for a Markdown template or with `pr`.
 - `--repo` reads the templates of another repository through the API. See [Enterprise hosts](../enterprise.md) for the host rules.
 - `--offline` skips the owner's shared `.github` repository.
+- `--raw`, `--json`, `--list` and `--offline` are switches. `=true` or `=1` turns a switch on, and `=false` or `=0` turns it off, as in `--json=false`. The last one wins. Any other value is a usage error, exit 2.
 
 ## Pick a template
 

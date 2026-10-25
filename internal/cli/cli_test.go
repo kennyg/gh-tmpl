@@ -19,8 +19,10 @@ import (
 
 	"github.com/cli/go-gh/v2/pkg/api"
 	"github.com/cli/go-gh/v2/pkg/repository"
+	"github.com/jdx/usage/go/argv"
 
 	"github.com/kennyg/gh-tmpl/internal/discover"
+	"github.com/kennyg/gh-tmpl/internal/spec"
 )
 
 // fixtureRepo copies a fixture repository into a temporary folder and
@@ -558,6 +560,101 @@ func TestPRCreate(t *testing.T) {
 	if code := h.run("pr", "create", "--body", "x", "--tmpl-skip"); code != ExitOK || len(h.calls) != 1 {
 		t.Errorf("--tmpl-skip: exit %d, calls %v", code, h.calls)
 	}
+}
+
+// TestSwitchValues checks that a switch reads true, false, 1 and 0, and
+// that any other value is a usage error.
+func TestSwitchValues(t *testing.T) {
+	h := newHarness(t, "pr-single")
+	for _, kind := range []string{"pr", "issue"} {
+		for _, tt := range []struct {
+			flag string
+			skip bool
+		}{
+			{"--tmpl-skip", true},
+			{"--tmpl-skip=true", true},
+			{"--tmpl-skip=1", true},
+			{"--tmpl-skip=false", false},
+			{"--tmpl-skip=0", false},
+			{"--tmpl-skip --tmpl-skip=false", false},
+			{"--tmpl-skip=0 --tmpl-skip", true},
+		} {
+			// The fixture has a pull request template and no issue
+			// template, so the check stops a pull request only.
+			wantCalls := 1
+			if !tt.skip && kind == "pr" {
+				wantCalls = 0
+			}
+			h.calls = nil
+			args := append([]string{kind, "create", "--body", "x"}, strings.Fields(tt.flag)...)
+			if code := h.run(args...); len(h.calls) != wantCalls {
+				t.Errorf("%s create %s: exit %d, %d gh calls, want %d\n%s", kind, tt.flag, code, len(h.calls), wantCalls, h.stderr)
+			}
+		}
+	}
+
+	for _, args := range [][]string{
+		{"pr", "create", "--body", "x", "--tmpl-skip=yes"},
+		{"pr", "create", "--body", "x", "--tmpl-skip="},
+		{"issue", "create", "--tmpl-offline=TRUE"},
+		{"pr", "create", "--tmpl-strict=2", "--title", "x"},
+		{"check", "--body", "x", "--strict=on"},
+		{"check", "--body", "x", "--allow-unchecked=-1"},
+		{"show", "--raw=no"},
+	} {
+		h.calls = nil
+		code := h.run(args...)
+		if code != ExitUsage || len(h.calls) != 0 {
+			t.Errorf("%q: exit %d, %d gh calls, want exit %d and none", args, code, len(h.calls), ExitUsage)
+		}
+		if !strings.Contains(h.stderr.String(), "(expected true, false, 1 or 0)") {
+			t.Errorf("%q: stderr does not list the values:\n%s", args, h.stderr)
+		}
+	}
+
+	// A gh value that looks like a switch with a value goes to gh as it is.
+	h.calls = nil
+	if code := h.run("pr", "create", "--title", "--tmpl-skip=yes", "--tmpl-skip=1"); code != ExitOK || len(h.calls) != 1 ||
+		!slices.Equal(h.calls[0].args, []string{"pr", "create", "--title", "--tmpl-skip=yes"}) {
+		t.Errorf("exit %d, calls %v\n%s", code, h.calls, h.stderr)
+	}
+
+	for _, tt := range []struct {
+		args []string
+		json bool
+	}{
+		{[]string{"show", "--json=1"}, true},
+		{[]string{"show", "--json=false"}, false},
+		{[]string{"show", "--json=0"}, false},
+		{[]string{"check", "--body", goodPR, "--json=true"}, true},
+		{[]string{"check", "--body", goodPR, "--json=0"}, false},
+		{[]string{"check", "--body", goodPR, "--json", "--json=false"}, false},
+	} {
+		if code := h.run(tt.args...); code != ExitOK {
+			t.Errorf("%q: exit %d\n%s", tt.args, code, h.stderr)
+		}
+		if got := json.Valid(h.stdout.Bytes()); got != tt.json {
+			t.Errorf("%q: JSON output %v, want %v:\n%s", tt.args, got, tt.json, h.stdout)
+		}
+	}
+}
+
+// TestSwitchesTakeBoolValue checks that the spec gives every switch
+// bool_value=#true. Without it the parser ignores the value of
+// --strict=false and turns the switch on.
+func TestSwitchesTakeBoolValue(t *testing.T) {
+	var walk func(path string, c *argv.Command)
+	walk = func(path string, c *argv.Command) {
+		for _, f := range c.Flags {
+			if !f.TakesValue && !f.BoolValue {
+				t.Errorf("%s --%s: add bool_value=#true in gh-tmpl.usage.kdl", path, f.Name)
+			}
+		}
+		for _, s := range c.Subcommands {
+			walk(path+" "+s.Name, s)
+		}
+	}
+	walk("gh tmpl", spec.Root)
 }
 
 func TestIssueCreateNeedsName(t *testing.T) {
