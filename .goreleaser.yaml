@@ -1,0 +1,75 @@
+# GoReleaser builds the binaries that "gh extension install" downloads.
+# gh picks the release asset whose name ends in "<os>-<arch>", with ".exe"
+# on Windows, so each binary is uploaded as it is, without an archive.
+version: 2
+
+project_name: gh-tmpl
+
+before:
+  hooks:
+    - go mod tidy -diff
+
+builds:
+  - id: gh-tmpl
+    binary: gh-tmpl
+    main: .
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    goos:
+      - darwin
+      - linux
+      - windows
+      - freebsd
+    goarch:
+      - amd64
+      - arm64
+      - "386"
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      - goos: darwin
+        goarch: "386"
+      - goos: darwin
+        goarch: arm
+      - goos: windows
+        goarch: arm
+
+archives:
+  - id: binaries
+    formats: [binary]
+    # For example gh-tmpl_v1.2.0_darwin-arm64 and gh-tmpl_v1.2.0_windows-amd64.exe.
+    name_template: "{{ .ProjectName }}_{{ .Tag }}_{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Tag }}_checksums.txt"
+  algorithm: sha256
+  # List the man page and completions too, so the attestation covers them.
+  extra_files:
+    - glob: ./man/gh-tmpl.1
+    - glob: ./completions/*
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge "
+
+release:
+  draft: false
+  prerelease: auto
+  # The man page and completion scripts come from gh-tmpl.usage.kdl. gh
+  # extension install ignores them, because their names do not end in
+  # <os>-<arch>.
+  extra_files:
+    - glob: ./man/gh-tmpl.1
+    - glob: ./completions/*

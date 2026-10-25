@@ -1,0 +1,284 @@
+.TH GH-TMPL 1
+.SH NAME
+gh\-tmpl \- Write and check issue and pull request bodies against a repository's templates
+.SH SYNOPSIS
+\fBgh\-tmpl\fR [COMMAND]
+.SH DESCRIPTION
+gh\-tmpl finds a repository's pull request and issue templates, prints them for
+you to fill in, and checks a body against them before gh creates anything.
+.PP
+It runs as a GitHub CLI extension: gh tmpl <command>.
+.PP
+.SH COMMANDS
+.TP
+\fBshow\fR
+Print a pull request or issue template.
+.TP
+\fBcheck\fR
+Check an issue or pull request body against its template.
+.TP
+\fBpr\fR
+Check the body, then run "gh pr create" with the other flags
+.TP
+\fBpr create\fR
+Check the body against the pull request template, then run "gh pr create".
+.TP
+\fBissue\fR
+Check the body, then run "gh issue create" with the other flags
+.TP
+\fBissue create\fR
+Check the body against the issue template, then run "gh issue create".
+.TP
+\fBcompletion\fR
+Print a shell completion script for the gh\-tmpl binary.
+.SH "GH-TMPL SHOW"
+Print a pull request or issue template.
+
+The kind defaults to pr. With several templates and no \-\-name, the command
+lists them and exits 2. A pull request uses the single\-file template, such as
+\&.github/pull_request_template.md, when there is one.
+
+An issue form (.yml) prints as Markdown sections that match the body GitHub
+writes for a submitted form. Use \-\-raw to print the YAML.
+.PP
+\fBUsage:\fR gh\-tmpl show [OPTIONS] [<kind>]
+.PP
+\fBOptions:\fR
+.PP
+.TP
+\fB\-\-name\fR \fI<template>\fR
+Pick the template with this ID, file name or name
+.TP
+\fB\-\-form\fR \fI<name>\fR
+Pick the issue form with this ID and print it as Markdown
+.TP
+\fB\-\-raw\fR
+Print the file as it is, front matter or YAML included
+.TP
+\fB\-\-json\fR
+Print JSON
+.TP
+\fB\-\-list\fR
+List the templates
+.TP
+\fB\-R, \-\-repo\fR \fI<repo>\fR
+Read the templates of [HOST/]OWNER/REPO through the API
+.TP
+\fB\-\-offline\fR
+Do not read the owner's shared .github repository
+\fBArguments:\fR
+.PP
+.TP
+\fB<kind>\fR
+The template kind: pr (the default) or issue
+\fBExamples:\fR
+.PP
+.PP
+.RS 4
+gh tmpl show pr > body.md
+.RE
+.PP
+.PP
+.RS 4
+gh tmpl show issue \-\-list
+.RE
+.PP
+.PP
+.RS 4
+gh tmpl show issue \-\-form bug_report > body.md
+.RE
+.PP
+.PP
+.RS 4
+gh tmpl show issue \-\-name feature_request \-\-json
+.RE
+.SH "GH-TMPL CHECK"
+Check an issue or pull request body against its template.
+
+The kind defaults to pr. Use "\-\-body\-file \-" to read the body from standard
+input. The check reports missing headings, empty sections, template comments
+left in the body, and checklists that nobody touched.
+
+Exit codes:
+
+    0  the body passes, or the repository has no template of this kind
+    1  the body fails the check
+    2  bad arguments, or no single template to check against
+.PP
+\fBUsage:\fR gh\-tmpl check [OPTIONS] [<kind>]
+.PP
+\fBOptions:\fR
+.PP
+.TP
+\fB\-F, \-\-body\-file\fR \fI<file>\fR
+Read the body from this file (use \- for standard input)
+.TP
+\fB\-b, \-\-body\fR \fI<text>\fR
+The body text
+.TP
+\fB\-\-name\fR \fI<template>\fR
+Check against the template with this ID, file name or name
+.TP
+\fB\-\-template\-file\fR \fI<file>\fR
+Check against this template file instead of discovering one
+.TP
+\fB\-\-strict\fR
+Fail on warnings too
+.TP
+\fB\-\-allow\-unchecked\fR
+Report an untouched checklist as a warning, not an error
+.TP
+\fB\-\-json\fR
+Print the report as JSON
+.TP
+\fB\-R, \-\-repo\fR \fI<repo>\fR
+Read the templates of [HOST/]OWNER/REPO through the API
+.TP
+\fB\-\-offline\fR
+Do not read the owner's shared .github repository
+\fBArguments:\fR
+.PP
+.TP
+\fB<kind>\fR
+The template kind: pr (the default) or issue
+\fBExamples:\fR
+.PP
+.PP
+.RS 4
+gh tmpl check \-\-body\-file body.md
+.RE
+.PP
+.PP
+.RS 4
+gh tmpl check issue \-\-name bug_report \-\-body\-file body.md \-\-json
+.RE
+.PP
+.PP
+.RS 4
+git log \-1 \-\-format=%b | gh tmpl check \-\-body\-file \-
+.RE
+.SH "GH-TMPL PR CREATE"
+Check the body against the pull request template, then run "gh pr create".
+
+gh\-tmpl reads the body from \-\-body, \-b, \-\-body\-file or \-F, checks it, and
+stops with exit code 1 if the check fails. If the body passes, it runs
+"gh pr create" with every argument except the \-\-tmpl\-* flags. Without
+\-\-body or \-\-body\-file there is no body to check, so it runs gh directly.
+.PP
+\fBUsage:\fR gh\-tmpl pr create [OPTIONS] [<gh_args>] ...
+.PP
+\fBOptions:\fR
+.PP
+.TP
+\fB\-\-tmpl\-name\fR \fI<template>\fR
+Check against the template with this ID or name
+.TP
+\fB\-\-tmpl\-strict\fR
+Fail on warnings too
+.TP
+\fB\-\-tmpl\-allow\-unchecked\fR
+Report an untouched checklist as a warning, not an error
+.TP
+\fB\-\-tmpl\-offline\fR
+Do not read the owner's shared .github repository
+.TP
+\fB\-\-tmpl\-skip\fR
+Run gh without the check
+\fBArguments:\fR
+.PP
+.TP
+\fB<gh_args>\fR
+Arguments for gh pr create, passed on in order
+\fBExamples:\fR
+.PP
+.PP
+.RS 4
+gh tmpl pr create \-\-title "Fix the login loop" \-\-body\-file body.md
+.RE
+.PP
+.PP
+.RS 4
+gh tmpl pr create \-t Fix \-F \- < body.md
+.RE
+.SH "GH-TMPL ISSUE CREATE"
+Check the body against the issue template, then run "gh issue create".
+
+gh\-tmpl reads the body from \-\-body, \-b, \-\-body\-file or \-F, checks it, and
+stops with exit code 1 if the check fails. If the body passes, it runs
+"gh issue create" with every argument except the \-\-tmpl\-* flags. Without
+\-\-body or \-\-body\-file there is no body to check, so it runs gh directly.
+.PP
+\fBUsage:\fR gh\-tmpl issue create [OPTIONS] [<gh_args>] ...
+.PP
+\fBOptions:\fR
+.PP
+.TP
+\fB\-\-tmpl\-name\fR \fI<template>\fR
+Check against the template with this ID or name
+.TP
+\fB\-\-tmpl\-strict\fR
+Fail on warnings too
+.TP
+\fB\-\-tmpl\-allow\-unchecked\fR
+Report an untouched checklist as a warning, not an error
+.TP
+\fB\-\-tmpl\-offline\fR
+Do not read the owner's shared .github repository
+.TP
+\fB\-\-tmpl\-skip\fR
+Run gh without the check
+\fBArguments:\fR
+.PP
+.TP
+\fB<gh_args>\fR
+Arguments for gh issue create, passed on in order
+\fBExamples:\fR
+.PP
+.PP
+.RS 4
+gh tmpl issue create \-\-tmpl\-name bug_report \-\-title "Crash" \-\-body\-file body.md
+.RE
+.SH "GH-TMPL COMPLETION"
+Print a shell completion script for the gh\-tmpl binary.
+
+gh does not complete the commands of extensions, so the script completes
+gh\-tmpl when the binary is on your PATH. The binary answers each completion
+request itself; the script needs no other tool.
+.PP
+\fBUsage:\fR gh\-tmpl completion <shell>
+.PP
+\fBArguments:\fR
+.PP
+.TP
+\fB<shell>\fR
+The shell
+\fBExamples:\fR
+.PP
+.PP
+.RS 4
+gh\-tmpl completion zsh > ~/.zfunc/_gh\-tmpl
+.RE
+.SH EXAMPLES
+\fBPrint the pull request template\fR
+.PP
+.RS 4
+gh tmpl show pr > body.md
+.RE
+.PP
+\fBCheck a body\fR
+.PP
+.RS 4
+gh tmpl check \-\-body\-file body.md
+.RE
+.PP
+\fBCheck, then create a pull request\fR
+.PP
+.RS 4
+gh tmpl pr create \-\-title "Fix" \-\-body\-file body.md
+.RE
+.SH LICENSE
+MIT
+.SH SOURCE
+https://github.com/kennyg/gh\-tmpl
+.SH AUTHOR
+Kenny Gatdula

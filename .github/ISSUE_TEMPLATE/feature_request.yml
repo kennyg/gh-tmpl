@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest a change to gh-tmpl.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What do you want to do that gh-tmpl does not let you do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should gh-tmpl do?
