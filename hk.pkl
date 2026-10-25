@@ -9,8 +9,10 @@ local linters = new Mapping<String, Step> {
     ["go-mod-tidy"] = Builtins.gomod_tidy
     ["golangci-lint"] = Builtins.golangci_lint
     ["actionlint"] = Builtins.actionlint
+    // Same threshold as `mise run lint:zizmor`, but offline, so the hook is fast.
     ["zizmor"] = (Builtins.zizmor) {
-        check = "zizmor --offline {{files}}"
+        check = "zizmor --offline --persona=auditor --min-severity=low {{files}}"
+        fix = "zizmor --offline --persona=auditor --min-severity=low --fix {{files}}"
     }
     ["typos"] = (Builtins.typos) {
         exclude = fixtures

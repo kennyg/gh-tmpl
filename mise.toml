@@ -34,9 +34,19 @@ run = "golangci-lint run"
 description = "Scan dependencies for known vulnerabilities"
 run = "govulncheck ./..."
 
+[tasks."lint:actionlint"]
+description = "Lint the GitHub Actions workflows with actionlint"
+run = "actionlint"
+
+# zizmor fails on findings of low severity or worse. It runs the online audits
+# only when GH_TOKEN or GITHUB_TOKEN is set.
+[tasks."lint:zizmor"]
+description = "Audit the GitHub Actions workflows with zizmor"
+run = "zizmor --persona=auditor --min-severity=low .github"
+
 [tasks."lint:actions"]
 description = "Lint and audit the GitHub Actions workflows"
-run = ["actionlint", "zizmor --offline .github"]
+depends = ["lint:actionlint", "lint:zizmor"]
 
 [tasks."release:check"]
 description = "Validate the GoReleaser config"
