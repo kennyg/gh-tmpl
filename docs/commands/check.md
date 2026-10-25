@@ -69,7 +69,7 @@ warning[unchecked-checkbox] line 13: The item "- [ ] I updated the docs in docs/
 | `findings[].fix` | What to change. |
 | `lookup_warnings` | The template files that gh-tmpl skipped because it could not read or parse them. See [Templates that cannot be read](../template-discovery.md#templates-that-cannot-be-read). |
 
-If the repository has no template of the kind, the check passes. The JSON then has `"template": null` and a `note`. On a usage error, the JSON has `"ok": false` and an `error` string. If there are several templates and no `--name`, or no template matches `--name`, the JSON also has a `templates` array with the ID, name and path of each template.
+If the repository has no template of the kind, the check passes. The JSON then has `"template": null` and a `note`. On a usage error, the JSON has `"ok": false` and an `error` string. If there are several templates and no `--name`, or no template matches `--name`, the JSON also has a `templates` array with the ID, name and path of each template, and a `lookup_warnings` array.
 
 ## Exit codes
 

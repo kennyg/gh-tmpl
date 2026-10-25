@@ -70,7 +70,7 @@ func runCheck(ctx context.Context, env *Env, c *spec.CheckCmd) int {
 			if asJSON && (errors.Is(err, discover.ErrAmbiguous) || errors.Is(err, discover.ErrNoMatch)) {
 				// List the choices, so that a program that reads only the
 				// JSON knows which names it can pass.
-				_ = writeJSON(env.Stdout, map[string]any{"ok": false, "error": msg, "kind": kind, "templates": infos(res)})
+				_ = writeJSON(env.Stdout, map[string]any{"ok": false, "error": msg, "kind": kind, "templates": infos(res), "lookup_warnings": lookupWarnings(res)})
 				warnf(env, "%s", msg)
 				return ExitUsage
 			}

@@ -479,6 +479,27 @@ func TestBrokenLocalTemplateWithFallback(t *testing.T) {
 	if stderr := h.stderr.String(); !strings.Contains(stderr, wantText) || strings.Contains(stderr, "fallback") {
 		t.Errorf("--offline: stderr = %s", stderr)
 	}
+
+	// The JSON of a failed selection lists the warnings too.
+	for _, args := range [][]string{
+		{"show", "issue", "--offline", "--json"},
+		{"show", "issue", "--json", "--name", "nope"},
+		{"check", "issue", "--body-file", body, "--json", "--name", "nope"},
+	} {
+		if code := h.run(args...); code != ExitUsage {
+			t.Fatalf("%v: exit %d: %s", args, code, h.stderr)
+		}
+		var out struct {
+			Error          string          `json:"error"`
+			LookupWarnings []lookupWarning `json:"lookup_warnings"`
+		}
+		if err := json.Unmarshal(h.stdout.Bytes(), &out); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		if w := out.LookupWarnings; out.Error == "" || len(w) != 1 || w[0].Source != "local" || !strings.HasPrefix(w[0].Problem, broken+": ") {
+			t.Errorf("%v: json = %s", args, h.stdout)
+		}
+	}
 }
 
 func file(content string) map[string]any {

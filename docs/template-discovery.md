@@ -67,7 +67,7 @@ The first source must exist. If the `--repo` repository does not exist, or the t
 
 gh-tmpl reads the clone's remote, or `GH_REPO`, to find the owner and host. It uses the GitHub REST contents API on the repository's default branch. If there is no GitHub remote, gh-tmpl skips the fallback. If `gh` has no login for the host, gh-tmpl prints a note and skips the fallback.
 
-Use `--offline` to skip the fallback.
+Use `--offline` to skip the fallback. With it, gh-tmpl makes no API requests in a clone.
 
 ## Templates that cannot be read
 
@@ -93,7 +93,7 @@ With `--json`, `gh tmpl show` and `gh tmpl check` also put the warnings in a `lo
 ]
 ```
 
-`fallback` names the source whose templates gh-tmpl used instead. It is left out when the skipped file is in the source that supplied the templates, or when no source had a template. With it, gh-tmpl makes no API requests in a clone.
+`fallback` names the source whose templates gh-tmpl used instead. It is left out when the skipped file is in the source that supplied the templates, or when no source had a template.
 
 ## The local clone
 

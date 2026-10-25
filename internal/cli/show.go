@@ -45,7 +45,7 @@ func runShow(ctx context.Context, env *Env, c *spec.ShowCmd) int {
 	if err != nil {
 		msg := selectError(env, res, err, "--name", name)
 		if asJSON {
-			_ = writeJSON(env.Stdout, map[string]any{"error": msg, "kind": kind, "templates": infos(res)})
+			_ = writeJSON(env.Stdout, map[string]any{"error": msg, "kind": kind, "templates": infos(res), "lookup_warnings": lookupWarnings(res)})
 		}
 		warnf(env, "%s", msg)
 		return ExitUsage
