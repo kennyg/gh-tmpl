@@ -20,10 +20,24 @@ takes the next word, whoever owns the flag. The theorems say:
 * `split_interleave`: the gh-tmpl words and the gh words interleave to the
   input, so each side keeps the input order.
 
+A switch is a gh-tmpl flag that takes no value. Its word is `--name`, or
+`--name=value` with one of the values true, false, 1 and 0. `switchWord`
+reads the word, and `switchOn` says what the parser binds. The theorems say:
+
+* `switchWord_bare` and `switchWord_attached`: `--name` sets the switch to
+  true, and `--name=value` sets it to `boolValue value`, never to true for
+  false or 0.
+* `boolValue_isSome`: the four values are the only ones, and
+  `parses_bad_value`: any other value is a usage error.
+* `switchWord_own` and `tokenize_switch`: a switch word, with or without its
+  value, is one gh-tmpl token and never takes the next word.
+* `switchOn_last`: the last word that sets a switch wins, so
+  `--tmpl-skip --tmpl-skip=false` leaves the check on.
+
 `scan` models `scanCreate`, which finds the body in the gh words. `tmplName`
 and `parses` say what the generated parser reads from the gh-tmpl words.
-They have no theorems. The differential test checks them against the Go
-code.
+Apart from `parses_bad_value`, they have no theorems. The differential test
+checks them and `switchOn` against the Go code.
 -/
 
 namespace GhTmpl.Argv
@@ -50,7 +64,7 @@ def Table.isOwn (t : Table) (w : String) : Bool :=
 /-- `w` is a gh-tmpl flag that takes the next word as its value. -/
 def Table.ownNeedsValue (t : Table) (w : String) : Bool :=
   match w.toList with
-  | '-' :: '-' :: rest => !rest.contains '=' && t.ownLongs.contains (String.ofList rest, true)
+  | '-' :: '-' :: rest => !rest.contains '=' && t.ownLongs.lookup (String.ofList rest) == some true
   | _ => false
 
 /-- A cluster of short flags takes the next word if its first short flag that
@@ -336,11 +350,190 @@ def tmplName (t : Table) (args : List String) : Option String :=
     | .own f none => (attached "tmpl-name" f).orElse fun _ => acc
     | _ => acc) none
 
-/-- The parser accepts the gh-tmpl words: they ask for no help, and no flag at
-the end lacks its value. -/
+/-! ## The switches
+
+A switch is a gh-tmpl flag that takes no value, such as `--tmpl-skip`. It
+takes no next word, but it can have an attached value, as in
+`--tmpl-skip=false`. `switchValues` in `internal/cli/cli.go` reads the four
+values below and rejects any other, and the generated parser binds the value
+of the last word that sets the switch. -/
+
+/-- The value of a switch. `none` is a usage error. -/
+def boolValue : String → Option Bool
+  | "true" | "1" => some true
+  | "false" | "0" => some false
+  | _ => none
+
+/-- `n` is a gh-tmpl switch. `--help` is not one. -/
+def Table.isSwitch (t : Table) (n : String) : Bool :=
+  n != "help" && t.ownLongs.lookup n == some false
+
+/-- The switch that a word sets, and its value: `--n` sets `n` to true, and
+`--n=v` sets `n` to `boolValue v`. `none` if the word is not a switch. -/
+def switchWord (t : Table) (w : String) : Option (String × Option Bool) :=
+  if w = "--" then none
+  else
+    match w.toList with
+    | '-' :: '-' :: rest =>
+      let name := String.ofList (rest.takeWhile (· != '='))
+      if !t.isSwitch name then none
+      else if rest.contains '=' then
+        some (name, boolValue (String.ofList ((rest.dropWhile (· != '=')).drop 1)))
+      else some (name, some true)
+    | _ => none
+
+/-- The value that a token gives switch `n`, if it sets `n`. -/
+def Token.sets (t : Table) (n : String) : Token → Option Bool
+  | .own f none =>
+    match switchWord t f with
+    | some (m, some b) => if m == n then some b else none
+    | _ => none
+  | _ => none
+
+/-- The value that the parser binds to switch `n`: the value of the last token
+that sets it, or false. -/
+def switchOn (t : Table) (n : String) (args : List String) : Bool :=
+  (tokenize t args).foldl (fun acc tok => (tok.sets t n).getD acc) false
+
+/-- The parser accepts the gh-tmpl words: they ask for no help, no flag at
+the end lacks its value, and each switch has one of the four values. -/
 def parses (t : Table) (args : List String) : Bool :=
   (tokenize t args).all fun
-    | .own f none => !(f == "-h" || f == "--help" || t.ownNeedsValue f)
+    | .own f none =>
+      !(f == "-h" || f == "--help" || t.ownNeedsValue f) &&
+        match switchWord t f with
+        | some (_, none) => false
+        | _ => true
     | _ => true
+
+/-! ### Theorems about the switches -/
+
+theorem boolValue_isSome (v : String) :
+    (boolValue v).isSome = true ↔ v ∈ ["true", "1", "false", "0"] := by
+  unfold boolValue
+  split <;> simp_all
+
+theorem any_of_lookup {l : List (String × Bool)} {n : String} {b : Bool}
+    (h : l.lookup n = some b) : l.any (·.1 == n) = true := by
+  induction l with
+  | nil => simp at h
+  | cons x xs ih =>
+    obtain ⟨k, v⟩ := x
+    simp only [List.lookup] at h
+    split at h
+    next he => simp_all
+    next => simp [ih h]
+
+theorem takeWhile_of_not_mem : ∀ {l : List Char}, '=' ∉ l → l.takeWhile (· != '=') = l
+  | [], _ => rfl
+  | c :: cs, h => by
+    have hc : c ≠ '=' := fun he => h (he ▸ List.mem_cons_self ..)
+    simp [hc, takeWhile_of_not_mem (fun hm => h (List.mem_cons_of_mem _ hm))]
+
+/-- A switch word is a gh-tmpl word that takes no next word. -/
+theorem switchWord_own (t : Table) (w : String) (h : (switchWord t w).isSome = true) :
+    w ≠ "--" ∧ t.isOwn w = true ∧ t.ownNeedsValue w = false := by
+  unfold switchWord at h
+  by_cases hd : w = "--"
+  · simp [hd] at h
+  simp only [hd, ite_false] at h
+  refine ⟨hd, ?_⟩
+  unfold Table.isOwn Table.ownNeedsValue
+  split at h
+  next rest hw =>
+    rw [hw]
+    simp only [Table.isSwitch, Bool.not_eq_true'] at h
+    split at h
+    · simp at h
+    next hs =>
+      simp only [Bool.not_eq_false, Bool.and_eq_true, bne_iff_ne, ne_eq, beq_iff_eq] at hs
+      refine ⟨any_of_lookup hs.2, ?_⟩
+      by_cases he : '=' ∈ rest
+      · simp [he]
+      · rw [takeWhile_of_not_mem he] at hs
+        simp [he, hs.2]
+  next => simp at h
+
+theorem tokenize_switch (t : Table) (w : String) (h : (switchWord t w).isSome = true) :
+    tokenize t [w] = [.own w none] := by
+  obtain ⟨hd, ho, hn⟩ := switchWord_own t w h
+  rw [tokenize.eq_def]
+  simp [hd, ho, hn]
+
+/-- `--n` sets switch `n` to true. -/
+theorem switchWord_bare (t : Table) (w n : String) (hw : w.toList = '-' :: '-' :: n.toList)
+    (hne : n.toList ≠ []) (hn : '=' ∉ n.toList) (hs : t.isSwitch n = true) :
+    switchWord t w = some (n, some true) := by
+  have hd : w ≠ "--" := by
+    intro he; subst he; simp at hw; exact hne (by simpa using hw.symm)
+  unfold switchWord
+  simp only [hd, ↓reduceIte]
+  rw [hw]
+  simp only [takeWhile_of_not_mem hn, String.ofList_toList, hs]
+  simp [hn]
+
+/-- `--n=v` sets switch `n` to `boolValue v`. -/
+theorem switchWord_attached (t : Table) (w n v : String)
+    (hw : w.toList = '-' :: '-' :: (n.toList ++ '=' :: v.toList))
+    (hn : '=' ∉ n.toList) (hs : t.isSwitch n = true) :
+    switchWord t w = some (n, boolValue v) := by
+  have hd : w ≠ "--" := by
+    intro he; subst he; simp at hw
+  have hpos : ∀ c ∈ n.toList, (c != '=') = true := by
+    intro c hc
+    have : c ≠ '=' := fun he => hn (he ▸ hc)
+    simpa using this
+  unfold switchWord
+  simp only [hd, ↓reduceIte]
+  rw [hw]
+  simp [List.takeWhile_append_of_pos hpos, List.dropWhile_append_of_pos hpos, hs]
+
+/-- A switch with a value outside the four is a usage error. -/
+theorem parses_bad_value (t : Table) (args : List String) (f n : String)
+    (hm : Token.own f none ∈ tokenize t args) (hf : switchWord t f = some (n, none)) :
+    parses t args = false := by
+  unfold parses
+  rw [List.all_eq_false]
+  exact ⟨_, hm, by simp [hf]⟩
+
+/-! ### The last word wins -/
+
+/-- The token takes no word after it: it is not `--` with the rest, and not a
+flag at the end that lacks its value. -/
+def Token.closed (t : Table) : Token → Bool
+  | .rest _ => false
+  | .own f none => !t.ownNeedsValue f
+  | .gh f none => !t.ghNeedsValue f
+  | _ => true
+
+/-- The last token of the list takes no word after it. -/
+def closed (t : Table) : List Token → Bool
+  | [] => true
+  | [x] => x.closed t
+  | _ :: x :: xs => closed t (x :: xs)
+
+theorem closed_tail (t : Table) (x : Token) (xs : List Token) (h : closed t (x :: xs) = true) :
+    closed t xs = true := by
+  cases xs with
+  | nil => rfl
+  | cons y ys => simpa [closed] using h
+
+/-- After words whose last token is closed, the tokens of more words follow
+the tokens of the first words. -/
+theorem tokenize_append (t : Table) (xs ys : List String) (h : closed t (tokenize t xs) = true) :
+    tokenize t (xs ++ ys) = tokenize t xs ++ tokenize t ys := by
+  fun_induction tokenize t xs <;> (try simp only [List.cons_append, List.nil_append]) <;>
+    (try have hc := closed_tail _ _ _ h) <;> (conv => lhs; rw [tokenize.eq_def]) <;>
+    simp_all [closed, Token.closed]
+
+/-- A switch word at the end sets the switch, whatever the words before it
+set, unless the word before it takes it as a value. So
+`--tmpl-skip --tmpl-skip=false` leaves the check on. -/
+theorem switchOn_last (t : Table) (xs : List String) (w n : String) (b : Bool)
+    (hc : closed t (tokenize t xs) = true) (hw : switchWord t w = some (n, some b)) :
+    switchOn t n (xs ++ [w]) = b := by
+  unfold switchOn
+  rw [tokenize_append t xs [w] hc, tokenize_switch t w (by simp [hw])]
+  simp [Token.sets, hw]
 
 end GhTmpl.Argv

@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/cli/go-gh/v2"
@@ -110,7 +112,7 @@ func Run(ctx context.Context, env *Env, args []string) int {
 		return ExitUsage
 	}
 	args = splitCreateArgs(args)
-	cli, err := spec.Parse(args)
+	cli, err := parse(args)
 	if err != nil {
 		var perr *argv.Error
 		if !errors.As(err, &perr) {
@@ -195,6 +197,60 @@ func splitCreateArgs(args []string) []string {
 	}
 	out = append(out, "--")
 	return append(out, gh...)
+}
+
+// parse runs the generated parser on args after switchValues.
+func parse(args []string) (*spec.Cli, error) {
+	args, err := switchValues(args)
+	if err != nil {
+		return nil, err
+	}
+	return spec.Parse(args)
+}
+
+// switchValues checks the values of the gh-tmpl switches, the flags that
+// take no value. The spec gives each switch bool_value=#true, so the parser
+// reads --strict=true and --strict=false. switchValues also maps 1 to true
+// and 0 to false. It rejects any other value, as in --strict=yes, with a
+// usage error, so a value never turns a switch on by mistake. It reads the
+// words up to the first "--", the words of the command that args select.
+//
+// verify/GhTmpl/Argv.lean models what the parser then reads from the
+// gh-tmpl words of "pr create" and "issue create".
+func switchValues(args []string) ([]string, error) {
+	cmd := argv.Walk(spec.Root, args).Cmd
+	out := slices.Clone(args)
+	for i, a := range args {
+		if a == "--" {
+			break
+		}
+		name, value, hasValue := strings.Cut(strings.TrimPrefix(a, "--"), "=")
+		if !strings.HasPrefix(a, "--") || !hasValue || !isSwitch(cmd, name) {
+			continue
+		}
+		switch value {
+		case "true", "1":
+			out[i] = "--" + name + "=true"
+		case "false", "0":
+			out[i] = "--" + name + "=false"
+		default:
+			return nil, &argv.Error{Code: argv.CodeInvalidValue, Name: "--" + name, Value: value, Want: "true, false, 1 or 0"}
+		}
+	}
+	return out, nil
+}
+
+// isSwitch reports whether name is a long flag of cmd that takes no value.
+func isSwitch(cmd *argv.Command, name string) bool {
+	if cmd == nil {
+		return false
+	}
+	for _, f := range cmd.Flags {
+		if !f.TakesValue && slices.Contains(f.Longs, name) {
+			return true
+		}
+	}
+	return false
 }
 
 // missingSubcommand prints the help of a command that needs a subcommand.

@@ -43,11 +43,11 @@ writes for a submitted form. Use --raw to print the YAML.
     }
     flag "--name <template>" help="Pick the template with this ID, file name or name"
     flag "--form <name>" help="Pick the issue form with this ID and print it as Markdown" conflicts="--name"
-    flag "--raw" help="Print the file as it is, front matter or YAML included"
-    flag "--json" help="Print JSON"
-    flag "--list" help="List the templates"
+    flag "--raw" help="Print the file as it is, front matter or YAML included" bool_value=#true
+    flag "--json" help="Print JSON" bool_value=#true
+    flag "--list" help="List the templates" bool_value=#true
     flag "-R --repo <repo>" help="Read the templates of [HOST/]OWNER/REPO through the API"
-    flag "--offline" help="Do not read the owner's shared .github repository"
+    flag "--offline" help="Do not read the owner's shared .github repository" bool_value=#true
 }
 
 cmd "check" help="Check a body against a template. Exits 1 if the body fails" {
@@ -74,11 +74,11 @@ Exit codes:
     flag "-b --body <text>" help="The body text"
     flag "--name <template>" help="Check against the template with this ID, file name or name"
     flag "--template-file <file>" help="Check against this template file instead of discovering one"
-    flag "--strict" help="Fail on warnings too"
-    flag "--allow-unchecked" help="Report an untouched checklist as a warning, not an error"
-    flag "--json" help="Print the report as JSON"
+    flag "--strict" help="Fail on warnings too" bool_value=#true
+    flag "--allow-unchecked" help="Report an untouched checklist as a warning, not an error" bool_value=#true
+    flag "--json" help="Print the report as JSON" bool_value=#true
     flag "-R --repo <repo>" help="Read the templates of [HOST/]OWNER/REPO through the API"
-    flag "--offline" help="Do not read the owner's shared .github repository"
+    flag "--offline" help="Do not read the owner's shared .github repository" bool_value=#true
 }
 
 cmd "pr" help="Check the body, then run \"gh pr create\" with the other flags" subcommand_required=#true {
@@ -94,10 +94,10 @@ stops with exit code 1 if the check fails. If the body passes, it runs
         example "gh tmpl pr create --title \"Fix the login loop\" --body-file body.md"
         example "gh tmpl pr create -t Fix -F - < body.md"
         flag "--tmpl-name <template>" help="Check against the template with this ID or name"
-        flag "--tmpl-strict" help="Fail on warnings too"
-        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error"
-        flag "--tmpl-offline" help="Do not read the owner's shared .github repository"
-        flag "--tmpl-skip" help="Run gh without the check"
+        flag "--tmpl-strict" help="Fail on warnings too" bool_value=#true
+        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error" bool_value=#true
+        flag "--tmpl-offline" help="Do not read the owner's shared .github repository" bool_value=#true
+        flag "--tmpl-skip" help="Run gh without the check" bool_value=#true
         arg "[gh_args]..." help="Arguments for gh pr create, passed on in order"
     }
 }
@@ -114,10 +114,10 @@ stops with exit code 1 if the check fails. If the body passes, it runs
 """#
         example "gh tmpl issue create --tmpl-name bug_report --title \"Crash\" --body-file body.md"
         flag "--tmpl-name <template>" help="Check against the template with this ID or name"
-        flag "--tmpl-strict" help="Fail on warnings too"
-        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error"
-        flag "--tmpl-offline" help="Do not read the owner's shared .github repository"
-        flag "--tmpl-skip" help="Run gh without the check"
+        flag "--tmpl-strict" help="Fail on warnings too" bool_value=#true
+        flag "--tmpl-allow-unchecked" help="Report an untouched checklist as a warning, not an error" bool_value=#true
+        flag "--tmpl-offline" help="Do not read the owner's shared .github repository" bool_value=#true
+        flag "--tmpl-skip" help="Run gh without the check" bool_value=#true
         arg "[gh_args]..." help="Arguments for gh issue create, passed on in order"
     }
 }
