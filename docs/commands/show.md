@@ -59,11 +59,14 @@ feature_request  Feature request  .github/ISSUE_TEMPLATE/feature_request.yml (fo
     "name": "Bug report",
     "description": "Report something in gh-tmpl that does not work as the docs say.",
     "labels": ["bug"]
-  }
+  },
+  "lookup_warnings": []
 }
 ```
 
 `source` is `local` for the clone in the working folder. For a template from the API it is `HOST/OWNER/REPO`, for example `github.com/octo/.github`. With `--list --json`, the output holds a `templates` array of the same objects, without `body` and `form`.
+
+`lookup_warnings` lists the template files that gh-tmpl skipped because it could not read or parse them. See [Templates that cannot be read](../template-discovery.md#templates-that-cannot-be-read).
 
 ## Exit codes
 

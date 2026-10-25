@@ -28,7 +28,8 @@ type leanResult struct {
 	Source    *int           `json:"source"`
 	Templates []leanTemplate `json:"templates"`
 	Shadowed  []string       `json:"shadowed"`
-	Problems  int            `json:"problems"`
+	// Problems holds the source index of each problem.
+	Problems []int `json:"problems"`
 }
 
 type leanFindCase struct {
@@ -129,13 +130,20 @@ func TestFindMatchesLean(t *testing.T) {
 			t.Errorf("case %d: %v: %v", line, c.Sources, err)
 			return
 		}
-		got := leanResult{Shadowed: res.Shadowed, Problems: len(res.Problems)}
-		if res.Source != "" {
+		index := func(source string) int {
 			var i int
-			if _, err := fmt.Sscanf(res.Source, "src%d", &i); err != nil {
-				t.Fatalf("case %d: source %q", line, res.Source)
+			if _, err := fmt.Sscanf(source, "src%d", &i); err != nil {
+				t.Fatalf("case %d: source %q", line, source)
 			}
+			return i
+		}
+		got := leanResult{Shadowed: res.Shadowed}
+		if res.Source != "" {
+			i := index(res.Source)
 			got.Source = &i
+		}
+		for _, p := range res.Problems {
+			got.Problems = append(got.Problems, index(p.Source))
 		}
 		for _, tp := range res.Templates {
 			got.Templates = append(got.Templates, leanTemplate{Path: tp.Path, Default: tp.Default})
@@ -148,7 +156,7 @@ func TestFindMatchesLean(t *testing.T) {
 
 func equalResult(a, b leanResult) bool {
 	return (a.Source == nil) == (b.Source == nil) && (a.Source == nil || *a.Source == *b.Source) &&
-		slices.Equal(a.Templates, b.Templates) && slices.Equal(a.Shadowed, b.Shadowed) && a.Problems == b.Problems
+		slices.Equal(a.Templates, b.Templates) && slices.Equal(a.Shadowed, b.Shadowed) && slices.Equal(a.Problems, b.Problems)
 }
 
 func showResult(r leanResult) string {
@@ -156,5 +164,5 @@ func showResult(r leanResult) string {
 	if r.Source != nil {
 		src = fmt.Sprint(*r.Source)
 	}
-	return fmt.Sprintf("source %s, templates %v, shadowed %q, problems %d", src, r.Templates, r.Shadowed, r.Problems)
+	return fmt.Sprintf("source %s, templates %v, shadowed %q, problems %v", src, r.Templates, r.Shadowed, r.Problems)
 }

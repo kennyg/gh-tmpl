@@ -47,6 +47,7 @@ func runCheck(ctx context.Context, env *Env, c *spec.CheckCmd) int {
 	}
 
 	var t discover.Template
+	var res discover.Result
 	var err error
 	if o.templateFile != "" {
 		t, err = loadTemplateFile(kind, o.templateFile)
@@ -54,12 +55,11 @@ func runCheck(ctx context.Context, env *Env, c *spec.CheckCmd) int {
 			return usageFail(env, asJSON, err.Error())
 		}
 	} else {
-		var res discover.Result
 		t, res, err = env.pick(ctx, kind, l, o.name)
 		if errors.Is(err, discover.ErrNone) {
 			note := fmt.Sprintf("no %s template found in %s; nothing to check", kindLabel(kind), sourceLabel(res))
 			if asJSON {
-				_ = writeJSON(env.Stdout, map[string]any{"ok": true, "errors": 0, "warnings": 0, "template": nil, "findings": []check.Finding{}, "note": note})
+				_ = writeJSON(env.Stdout, map[string]any{"ok": true, "errors": 0, "warnings": 0, "template": nil, "findings": []check.Finding{}, "note": note, "lookup_warnings": lookupWarnings(res)})
 			} else {
 				fmt.Fprintf(env.Stdout, "PASS: %s.\n", note)
 			}
@@ -70,7 +70,7 @@ func runCheck(ctx context.Context, env *Env, c *spec.CheckCmd) int {
 			if asJSON && (errors.Is(err, discover.ErrAmbiguous) || errors.Is(err, discover.ErrNoMatch)) {
 				// List the choices, so that a program that reads only the
 				// JSON knows which names it can pass.
-				_ = writeJSON(env.Stdout, map[string]any{"ok": false, "error": msg, "kind": kind, "templates": infos(res)})
+				_ = writeJSON(env.Stdout, map[string]any{"ok": false, "error": msg, "kind": kind, "templates": infos(res), "lookup_warnings": lookupWarnings(res)})
 				warnf(env, "%s", msg)
 				return ExitUsage
 			}
@@ -80,7 +80,7 @@ func runCheck(ctx context.Context, env *Env, c *spec.CheckCmd) int {
 
 	rep := runChecks(t, body, o.options())
 	if asJSON {
-		_ = writeJSON(env.Stdout, jsonReport(t, rep))
+		_ = writeJSON(env.Stdout, jsonReport(t, rep, res))
 	} else {
 		printReport(env.Stdout, t, rep)
 	}
@@ -160,11 +160,12 @@ func runChecks(t discover.Template, body string, opts check.Options) check.Repor
 
 type reportJSON struct {
 	check.Report
-	Template templateInfo `json:"template"`
+	Template       templateInfo    `json:"template"`
+	LookupWarnings []lookupWarning `json:"lookup_warnings"`
 }
 
-func jsonReport(t discover.Template, rep check.Report) reportJSON {
-	return reportJSON{Report: rep, Template: info(t)}
+func jsonReport(t discover.Template, rep check.Report, res discover.Result) reportJSON {
+	return reportJSON{Report: rep, Template: info(t), LookupWarnings: lookupWarnings(res)}
 }
 
 func printReport(w io.Writer, t discover.Template, rep check.Report) {

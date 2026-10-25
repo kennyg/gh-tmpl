@@ -25,7 +25,8 @@ Each theorem is about the Lean model, not about the Go code.
 | Check rules | `check.Markdown` | `strict_pass_touches_every_checkbox` | With `--strict`, a pass means that every template checkbox is checked or removed. |
 | Check rules | `check.Markdown` | `untouched_reported` | Each untouched checkbox is in a finding. |
 | Lookup order | `discover.Find` | `find_unreadable_first` | A first source that is missing or that cannot be read is an error, never a pass with no templates. |
-| Lookup order | `discover.Find` | `find_first_with_templates` | The templates come from the first source that has any. Each source before it was skipped, a missing fallback, or empty. |
+| Lookup order | `discover.Find` | `find_first_with_templates` | The templates come from the first source that has any. Each source before it was skipped, a missing fallback, or empty. The problems of that source and of each source before it are kept, so a fallback cannot hide a broken template. |
+| Lookup order | `discover.Find` | `find_no_templates_problems` | A lookup without templates keeps the problems of every source. |
 | Lookup order | `discover.FindIn` | `findIn_defaults` | The single-file template is the first candidate in the documented order. |
 | Lookup order | `discover.FindIn` | `findIn_folder` | The folder templates come from the first template folder in that order that holds a template. |
 
@@ -41,7 +42,7 @@ Some parts of the model have no theorems. The differential tests still compare t
 | `Argv.parses`, `Argv.tmplName`, `Argv.switchOn` | `Run` and the generated parser | Whether the parser accepts the gh-tmpl words, which `--tmpl-name` it reads, and the value it binds to each switch |
 | `Check.headingPart` | `check.Markdown` | The `empty-section` and `unchanged-section` rules |
 | `Check.check` | `check.Markdown` | The order, sections and lines of the findings |
-| `Lookup.findIn` | `discover.FindIn` | The shadowed paths and the count of problems |
+| `Lookup.findIn` | `discover.FindIn` | The shadowed paths and the count of problems in one repository |
 
 The issue form check, `check.Form`, has no model.
 

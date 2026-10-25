@@ -122,9 +122,7 @@ func (env *Env) pick(ctx context.Context, kind discover.Kind, l lookup, name str
 	if err != nil {
 		return discover.Template{}, res, err
 	}
-	for _, p := range res.Problems {
-		warnf(env, "skipped a template: %s", safeText(p))
-	}
+	warnProblems(env, res)
 	t, err := discover.Select(res, name)
 	return t, res, err
 }

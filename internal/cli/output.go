@@ -63,6 +63,39 @@ func infos(res discover.Result) []templateInfo {
 	return out
 }
 
+// lookupWarning is a template file that discovery skipped because it could
+// not be read or parsed.
+type lookupWarning struct {
+	Source  string `json:"source"`
+	Problem string `json:"problem"`
+	// Fallback is the source whose templates were used instead, when the
+	// problem is in a source that had no usable template.
+	Fallback string `json:"fallback,omitempty"`
+}
+
+func lookupWarnings(res discover.Result) []lookupWarning {
+	out := make([]lookupWarning, 0, len(res.Problems))
+	for _, p := range res.Problems {
+		w := lookupWarning{Source: p.Source, Problem: p.Message}
+		if len(res.Templates) > 0 && p.Source != res.Source {
+			w.Fallback = res.Source
+		}
+		out = append(out, w)
+	}
+	return out
+}
+
+// warnProblems prints the problems that discovery found as warnings.
+func warnProblems(env *Env, res discover.Result) {
+	for _, w := range lookupWarnings(res) {
+		msg := fmt.Sprintf("skipped a template in %s: %s", sourceName(w.Source), safeText(w.Problem))
+		if w.Fallback != "" {
+			msg += fmt.Sprintf("; used the fallback templates in %s instead", sourceName(w.Fallback))
+		}
+		warnf(env, "%s", msg)
+	}
+}
+
 // printList writes a table of the templates in res.
 func printList(w io.Writer, res discover.Result) {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
