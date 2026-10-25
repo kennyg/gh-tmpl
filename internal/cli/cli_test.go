@@ -572,6 +572,20 @@ func TestCreateKeepsValuesSpelledLikeFlags(t *testing.T) {
 	}
 }
 
+// TestCreateTmplNameTakesDashValue checks that --tmpl-name takes the next
+// word even if it starts with "-".
+func TestCreateTmplNameTakesDashValue(t *testing.T) {
+	h := newHarness(t, "pr-multi")
+	body := h.write(t, "b.md", "## Feature\n\nDark mode.\n")
+	code := h.run("pr", "create", "--tmpl-name", "-b", "-F", body)
+	if code != ExitUsage || len(h.calls) != 0 {
+		t.Fatalf("exit %d, calls %v\n%s", code, h.calls, h.stderr)
+	}
+	if !strings.Contains(h.stderr.String(), `"-b"`) {
+		t.Errorf("stderr does not name the template -b:\n%s", h.stderr)
+	}
+}
+
 // ghValueFlags reads the flags that take a value from "gh <sub> create
 // --help". A flag that takes a value has a placeholder after its name.
 func ghValueFlags(t *testing.T, sub string) map[string]bool {

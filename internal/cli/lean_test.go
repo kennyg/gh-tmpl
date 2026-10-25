@@ -7,6 +7,7 @@ import (
 
 	"github.com/kennyg/gh-tmpl/internal/discover"
 	"github.com/kennyg/gh-tmpl/internal/leantest"
+	"github.com/kennyg/gh-tmpl/internal/spec"
 )
 
 type leanScan struct {
@@ -25,6 +26,10 @@ type leanArgvCase struct {
 	Own  []string  `json:"own"`
 	Gh   []string  `json:"gh"`
 	Scan *leanScan `json:"scan"`
+	// Parses tells whether the generated parser accepts the gh-tmpl words,
+	// and TmplName is the --tmpl-name value it reads.
+	Parses   bool    `json:"parses"`
+	TmplName *string `json:"tmplName"`
 }
 
 // TestSplitCreateMatchesLean checks splitCreate, scanCreate and Run with the
@@ -62,10 +67,33 @@ func TestSplitCreateMatchesLean(t *testing.T) {
 				deref(sc.body), sc.bodyFile, sc.repo, deref(c.Scan.Body), deref(c.Scan.BodyFile), deref(c.Scan.Repo))
 		}
 
+		// The generated parser must read the gh-tmpl words as the model
+		// does, in every case, also when Run stops before it calls gh.
+		parsed, err := spec.Parse(splitCreateArgs(append([]string{string(c.Kind), "create"}, c.Args...)))
+		switch {
+		case !c.Parses:
+			if err == nil {
+				t.Errorf("case %d: the parser accepts %q, want an error", line, c.Args)
+			}
+		case err != nil:
+			t.Errorf("case %d: the parser rejects %q: %v", line, c.Args, err)
+		default:
+			gotName := ""
+			if parsed.Pr != nil {
+				gotName = parsed.Pr.Create.TmplName
+			} else {
+				gotName = parsed.Issue.Create.TmplName
+			}
+			if gotName != deref(c.TmplName) {
+				t.Errorf("case %d: the parser reads --tmpl-name %q from %q, want %q", line, gotName, c.Args, deref(c.TmplName))
+			}
+		}
+
 		// Run, with the generated parser, must pass the gh words on
 		// unchanged. The fixture has no templates, so Run calls gh unless
-		// the arguments are bad, ask for help, or name a file or a remote
-		// repository that the harness cannot read.
+		// the parser rejects the arguments or they name a file or a remote
+		// repository that the harness cannot read. The parser check above
+		// covers the first reason.
 		h.calls = nil
 		h.run(append([]string{string(c.Kind), "create"}, c.Args...)...)
 		if len(h.calls) == 0 {

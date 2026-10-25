@@ -98,7 +98,8 @@ def argvCase (kind : String) (args : List String) : String :=
                          ("repo", jsonOpt s.repo)]
     | none => "null"
   jsonObj [("kind", jsonStr kind), ("args", jsonArr (args.map jsonStr)),
-           ("own", jsonArr (own.map jsonStr)), ("gh", jsonArr (gh.map jsonStr)), ("scan", scan)]
+           ("own", jsonArr (own.map jsonStr)), ("gh", jsonArr (gh.map jsonStr)), ("scan", scan),
+           ("parses", jsonBool (Argv.parses t args)), ("tmplName", jsonOpt (Argv.tmplName t args))]
 
 def tableLine (kind : String) : String :=
   jsonObj [("kind", jsonStr kind),

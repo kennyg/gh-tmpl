@@ -20,8 +20,10 @@ takes the next word, whoever owns the flag. The theorems say:
 * `split_interleave`: the gh-tmpl words and the gh words interleave to the
   input, so each side keeps the input order.
 
-`scan` models `scanCreate`, which finds the body in the gh words. It has no
-theorems. The differential test checks it against the Go code.
+`scan` models `scanCreate`, which finds the body in the gh words. `tmplName`
+and `parses` say what the generated parser reads from the gh-tmpl words.
+They have no theorems. The differential test checks them against the Go
+code.
 -/
 
 namespace GhTmpl.Argv
@@ -314,5 +316,31 @@ def scan (t : Table) : List String → Scan → Option Scan
               | r => r
             scan t ws (s.record long (String.ofList value))
       | _ => scan t ws s
+
+/-! ## What the parser reads from the gh-tmpl words -/
+
+/-- The value after the first `=` of a long flag, if the flag is `--name=value`. -/
+def attached (name : String) (w : String) : Option String :=
+  match w.toList with
+  | '-' :: '-' :: rest =>
+    if String.ofList (rest.takeWhile (· != '=')) == name && rest.contains '=' then
+      some (String.ofList ((rest.dropWhile (· != '=')).drop 1))
+    else none
+  | _ => none
+
+/-- The value of the last `--tmpl-name`. -/
+def tmplName (t : Table) (args : List String) : Option String :=
+  (tokenize t args).foldl (fun acc tok =>
+    match tok with
+    | .own f (some v) => if f == "--tmpl-name" then some v else acc
+    | .own f none => (attached "tmpl-name" f).orElse fun _ => acc
+    | _ => acc) none
+
+/-- The parser accepts the gh-tmpl words: they ask for no help, and no flag at
+the end lacks its value. -/
+def parses (t : Table) (args : List String) : Bool :=
+  (tokenize t args).all fun
+    | .own f none => !(f == "-h" || f == "--help" || t.ownNeedsValue f)
+    | _ => true
 
 end GhTmpl.Argv

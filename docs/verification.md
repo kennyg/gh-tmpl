@@ -34,6 +34,7 @@ Some parts of the model have no theorems. The differential tests still compare t
 | Model | Go code | Not proved |
 | --- | --- | --- |
 | `Argv.scan` | `scanCreate` | Which body, body file and repository the scan finds in the gh words |
+| `Argv.parses`, `Argv.tmplName` | `Run` and the generated parser | Whether the parser accepts the gh-tmpl words, and which `--tmpl-name` it reads |
 | `Check.headingPart` | `check.Markdown` | The `empty-section` and `unchanged-section` rules |
 | `Check.check` | `check.Markdown` | The order, sections and lines of the findings |
 | `Lookup.findIn` | `discover.FindIn` | The shadowed paths and the count of problems |
@@ -52,7 +53,7 @@ The third link is review. A person must read the model next to the Go code and j
 
 Some parts are outside the model completely:
 
-- The generated usage parser. The tests run it through `Run`, but no proof covers it. gh-tmpl now gives it the gh words after a `--`, where it keeps every word.
+- The generated usage parser. The tests run it on every case, but no proof covers it. gh-tmpl gives it the gh words after a `--`, where it keeps every word. The parser rejects a separate value that starts with `-`, so gh-tmpl attaches each gh-tmpl value to its flag, as in `--tmpl-name=-x`.
 - `gh` itself. The model assumes that `gh` reads a flag and its value the way the grammar says.
 - The file readers. The lookup model uses a repository in memory. It does not cover the API client, the file size limit or the limit of 100 templates per folder. In the model, every issue form fails to parse.
 - Text handling such as Unicode case folding. The cases use ASCII.
