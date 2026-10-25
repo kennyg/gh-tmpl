@@ -32,6 +32,8 @@ Use [semantic versioning](https://semver.org). A tag with a suffix, such as `v1.
 | Build and publish | `goreleaser release --clean`, with the config in `.goreleaser.yaml` |
 | Attest | `actions/attest-build-provenance` signs a SLSA build provenance attestation for each binary listed in the checksums file |
 
+The workflow runs one release per tag at a time, with `cancel-in-progress: false`. A second run for the same tag waits until the first run ends. A new run never cancels a release that is in progress.
+
 The job has `contents: write` to publish the release, `id-token: write` to get a Sigstore signing certificate, and `attestations: write` to store the attestation. Every action is pinned to a commit SHA.
 
 ## Release assets

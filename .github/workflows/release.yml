@@ -7,8 +7,21 @@ on:
 
 permissions: {}
 
+env:
+  # A job installs only the tools in its install_args. Without this, `mise run`
+  # installs every other tool in mise.toml without a GitHub token, and the
+  # GitHub API rate limit can fail the job.
+  MISE_AUTO_INSTALL: "false"
+
+# One release per tag at a time. A second push of the same tag waits in the
+# queue. It never cancels a release that is in progress.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    name: release
     runs-on: ubuntu-latest
     permissions:
       contents: write     # create the release and upload the binaries
