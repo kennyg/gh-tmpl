@@ -1,0 +1,39 @@
+name: Bug report
+description: Report something in gh-tmpl that does not work as the docs say.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not report security problems here. Follow SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Tell us what you ran, what you expected, and what you saw.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: gh-tmpl version
+      description: The output of "gh tmpl --version".
+      placeholder: gh-tmpl 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS
+        - Linux
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: template
+    attributes:
+      label: Template and body
+      description: A small template and body that show the problem. Remove private content.
+      render: markdown

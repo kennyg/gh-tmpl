@@ -35,7 +35,7 @@ run = "govulncheck ./..."
 
 [tasks."lint:actions"]
 description = "Lint and audit the GitHub Actions workflows"
-run = ["actionlint", "zizmor --offline .github/workflows"]
+run = ["actionlint", "zizmor --offline .github"]
 
 [tasks."release:check"]
 description = "Validate the GoReleaser config"
@@ -50,6 +50,6 @@ description = "Run every check that CI runs"
 depends = ["test", "lint", "vuln", "lint:actions", "release:check"]
 
 [tasks.install-local]
-description = "Build the extension and install it into gh from this folder"
+description = "Build the extension and install it into gh from this folder, which must be named gh-tmpl"
 depends = ["build"]
 run = "gh extension install ."
