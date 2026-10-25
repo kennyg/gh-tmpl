@@ -64,13 +64,9 @@ Some parts are outside the model completely:
 
 ## Run the proofs
 
-Install [elan](https://github.com/leanprover/elan), the Lean version manager:
+`mise install` installs [elan](https://github.com/leanprover/elan), the Lean version manager, with the other tools. `mise.toml` pins the elan version.
 
-```sh
-brew install elan-init
-```
-
-The file `verify/lean-toolchain` pins the Lean version. elan downloads it on the first build. The model uses only the Lean core library, so the build takes a few seconds.
+The file `verify/lean-toolchain` pins the Lean version. elan downloads it into `~/.elan` on the first build. The model uses only the Lean core library, so the build takes a few seconds.
 
 | Task | What it runs |
 | --- | --- |

@@ -29,7 +29,7 @@ hk install
 | `mise run generate` | Regenerates the parser, the command reference, the man page and the completions from `gh-tmpl.usage.kdl` |
 | `mise run generate:check` | Fails if `mise run generate` would change a file |
 | `mise run check` | test, lint, vuln, lint:actions, release:check and generate:check |
-| `mise run verify` | Checks the Lean proofs in `verify/` and writes the Lean test cases again. Needs elan. |
+| `mise run verify` | Checks the Lean proofs in `verify/` and writes the Lean test cases again. Needs the elan that `mise install` installs. |
 | `mise run verify:check` | Fails if a proof fails or a Lean test case file is out of date, then runs the differential tests |
 | `mise run install-local` | Builds the binary and runs `gh extension install .` |
 
