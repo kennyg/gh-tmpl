@@ -463,3 +463,45 @@ func TestRemoteFSWithGoGh(t *testing.T) {
 		})
 	}
 }
+
+func TestFindKeepsProblemsWhenFallingBack(t *testing.T) {
+	shared := NewRemote(&fakeAPI{t: t, root: filepath.Join("testdata", "repos", "shared-github"), prefix: "repos/octo/.github/contents"}, "github.com", "octo", ".github")
+
+	tooLarge := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tooLarge, "pull_request_template.md"), bytes.Repeat([]byte("a"), MaxTemplateSize+1), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	big, err := OpenLocal(tooLarge)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = big.Close() })
+
+	tests := []struct {
+		name    string
+		local   *LocalFS
+		kind    Kind
+		path    string
+		problem string
+	}{
+		{"invalid form", openFixture(t, "issue-broken"), Issue, "ISSUE_TEMPLATE/bug.md", ".github/ISSUE_TEMPLATE/bug_report.yml: "},
+		{"too large", big, PR, "pull_request_template.md", "pull_request_template.md: " + ErrTooLarge.Error()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res, err := Find(context.Background(), tt.kind,
+				func() (FS, error) { return tt.local, nil },
+				func() (FS, error) { return shared, nil },
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if res.Source != "github.com/octo/.github" || len(res.Templates) != 1 || res.Templates[0].Path != tt.path {
+				t.Fatalf("result = %+v", res)
+			}
+			if len(res.Problems) != 1 || res.Problems[0].Source != "local" || !strings.HasPrefix(res.Problems[0].Message, tt.problem) {
+				t.Fatalf("problems = %+v, want one in local starting with %q", res.Problems, tt.problem)
+			}
+		})
+	}
+}

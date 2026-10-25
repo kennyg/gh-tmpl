@@ -67,7 +67,33 @@ The first source must exist. If the `--repo` repository does not exist, or the t
 
 gh-tmpl reads the clone's remote, or `GH_REPO`, to find the owner and host. It uses the GitHub REST contents API on the repository's default branch. If there is no GitHub remote, gh-tmpl skips the fallback. If `gh` has no login for the host, gh-tmpl prints a note and skips the fallback.
 
-Use `--offline` to skip the fallback. With it, gh-tmpl makes no API requests in a clone.
+Use `--offline` to skip the fallback.
+
+## Templates that cannot be read
+
+gh-tmpl skips a template file that it cannot read or parse. Examples are a file over 256 KiB, a file it cannot open, and an issue form with invalid YAML. It prints a warning on standard error for each skipped file. The warning names the source, which is the local clone or `HOST/OWNER/REPO`.
+
+A skipped file does not count as a template. If the first source then has no usable template, gh-tmpl reads the fallback. The warning about the first source stays, and it names the fallback that gh-tmpl used:
+
+```text
+gh-tmpl: skipped a template in the local clone: .github/ISSUE_TEMPLATE/bug_report.yml: invalid YAML: yaml: line 3: did not find expected node content; used the fallback templates in github.com/octo/.github instead
+```
+
+Fix the broken file to use it again. A skipped file does not change the exit code. If gh-tmpl finds a usable template in any source, the command goes on with it.
+
+With `--json`, `gh tmpl show` and `gh tmpl check` also put the warnings in a `lookup_warnings` array:
+
+```json
+"lookup_warnings": [
+  {
+    "source": "local",
+    "problem": ".github/ISSUE_TEMPLATE/bug_report.yml: invalid YAML: yaml: line 3: did not find expected node content",
+    "fallback": "github.com/octo/.github"
+  }
+]
+```
+
+`fallback` names the source whose templates gh-tmpl used instead. It is left out when the skipped file is in the source that supplied the templates, or when no source had a template. With it, gh-tmpl makes no API requests in a clone.
 
 ## The local clone
 

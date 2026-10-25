@@ -262,7 +262,7 @@ def findCase (kind : Kind) (srcs : List Src) : String :=
         ("templates", jsonArr (r.templates.map fun (p, d) =>
           jsonObj [("path", jsonStr p.str), ("default", jsonBool d)])),
         ("shadowed", jsonArr (r.shadowed.map jsonStr)),
-        ("problems", toString r.problems)]
+        ("problems", jsonArr (r.problems.map toString))]
   jsonObj [("kind", jsonStr (match kind with | .pr => "pr" | .issue => "issue")),
            ("sources", jsonArr (srcs.map srcJson)), ("result", res)]
 

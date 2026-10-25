@@ -78,7 +78,15 @@ type Template struct {
 	Form *form.Form `json:"form,omitempty"`
 }
 
-// Result is the outcome of discovery in one repository.
+// Problem is a template file that could not be read or parsed.
+type Problem struct {
+	// Source is the source of the file, as in Template.Source.
+	Source string
+	// Message says which file it is and what is wrong with it.
+	Message string
+}
+
+// Result is the outcome of discovery.
 type Result struct {
 	Kind      Kind
 	Source    string
@@ -86,12 +94,16 @@ type Result struct {
 	// Shadowed lists template paths that a location with higher
 	// precedence hides.
 	Shadowed []string
-	// Problems lists template files that could not be read or parsed.
-	Problems []string
+	// Problems lists template files that could not be read or parsed, in
+	// every source that discovery searched. A problem in an earlier source
+	// is kept when a fallback source supplies the templates.
+	Problems []Problem
 }
 
 // Find searches each source in order and returns the first result that
-// holds at least one template. A source is a function so that a caller can
+// holds at least one template. The result keeps the problems of every
+// source that Find searched, so that a broken template in the repository
+// is not hidden by the templates of a fallback. A source is a function so that a caller can
 // delay costly setup, such as an API client, until discovery needs it.
 // A source function that returns a nil FS is skipped.
 //
@@ -117,10 +129,10 @@ func Find(ctx context.Context, kind Kind, sources ...func() (FS, error)) (Result
 		if err != nil {
 			return res, err
 		}
+		res.Problems = append(last.Problems, res.Problems...)
 		if len(res.Templates) > 0 {
 			return res, nil
 		}
-		res.Problems = append(last.Problems, res.Problems...)
 		last = res
 	}
 	return last, nil
@@ -170,7 +182,7 @@ func FindIn(ctx context.Context, fsys FS, kind Kind) (Result, error) {
 				}
 				t, err := load(ctx, fsys, kind, p, true)
 				if err != nil {
-					res.Problems = append(res.Problems, err.Error())
+					res.Problems = append(res.Problems, Problem{Source: fsys.Source(), Message: err.Error()})
 					continue
 				}
 				singleFound = true
@@ -249,7 +261,7 @@ func loadFolder(ctx context.Context, fsys FS, kind Kind, dir string, res *Result
 		}
 		t, err := load(ctx, fsys, kind, path.Join(dir, e.Name), false)
 		if err != nil {
-			res.Problems = append(res.Problems, err.Error())
+			res.Problems = append(res.Problems, Problem{Source: fsys.Source(), Message: err.Error()})
 			continue
 		}
 		out = append(out, t)

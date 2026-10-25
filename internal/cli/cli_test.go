@@ -415,6 +415,72 @@ func TestOrgFallbackWithoutLogin(t *testing.T) {
 	}
 }
 
+func TestBrokenLocalTemplateWithFallback(t *testing.T) {
+	h := newHarness(t, "issue-broken")
+	h.env.CurrentRepo = func() (repository.Repository, error) {
+		return repository.Repository{Host: "github.com", Owner: "octo", Name: "app"}, nil
+	}
+	h.env.NewClient = func(string) (discover.Requester, error) {
+		return fakeContents(func(p string) (any, bool) {
+			switch p {
+			case "repos/octo/.github/contents":
+				return []map[string]string{{"name": "ISSUE_TEMPLATE", "type": "dir"}}, true
+			case "repos/octo/.github/contents/ISSUE_TEMPLATE":
+				return []map[string]string{{"name": "bug.md", "type": "file"}}, true
+			case "repos/octo/.github/contents/ISSUE_TEMPLATE/bug.md":
+				return file("## What happened\n"), true
+			}
+			return nil, false
+		}), nil
+	}
+	const broken = ".github/ISSUE_TEMPLATE/bug_report.yml"
+	wantText := "gh-tmpl: skipped a template in the local clone: " + broken
+	wantFallback := "; used the fallback templates in github.com/octo/.github instead\n"
+
+	if code := h.run("show", "issue"); code != ExitOK {
+		t.Fatalf("show: exit %d: %s", code, h.stderr)
+	}
+	if !strings.Contains(h.stdout.String(), "## What happened") {
+		t.Errorf("show: stdout = %s", h.stdout)
+	}
+	if stderr := h.stderr.String(); !strings.Contains(stderr, wantText) || !strings.HasSuffix(stderr, wantFallback) {
+		t.Errorf("show: stderr = %s", stderr)
+	}
+
+	body := h.write(t, "b.md", "## What happened\n\nIt broke.\n")
+	for _, args := range [][]string{
+		{"show", "issue", "--json"},
+		{"show", "issue", "--list", "--json"},
+		{"check", "issue", "--body-file", body, "--json"},
+	} {
+		if code := h.run(args...); code != ExitOK {
+			t.Fatalf("%v: exit %d: %s", args, code, h.stderr)
+		}
+		var out struct {
+			LookupWarnings []lookupWarning `json:"lookup_warnings"`
+		}
+		if err := json.Unmarshal(h.stdout.Bytes(), &out); err != nil {
+			t.Fatalf("%v: %v", args, err)
+		}
+		w := out.LookupWarnings
+		if len(w) != 1 || w[0].Source != "local" || !strings.HasPrefix(w[0].Problem, broken+": ") || w[0].Fallback != "github.com/octo/.github" {
+			t.Errorf("%v: lookup_warnings = %+v", args, w)
+		}
+		if !strings.Contains(h.stderr.String(), wantText) {
+			t.Errorf("%v: stderr = %s", args, h.stderr)
+		}
+	}
+
+	// Without the fallback, the warning names no fallback, and the lookup
+	// finds no template.
+	if code := h.run("show", "issue", "--offline"); code != ExitUsage {
+		t.Errorf("--offline: exit %d", code)
+	}
+	if stderr := h.stderr.String(); !strings.Contains(stderr, wantText) || strings.Contains(stderr, "fallback") {
+		t.Errorf("--offline: stderr = %s", stderr)
+	}
+}
+
 func file(content string) map[string]any {
 	return map[string]any{"type": "file", "size": len(content), "encoding": "base64", "content": base64.StdEncoding.EncodeToString([]byte(content))}
 }

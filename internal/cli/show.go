@@ -26,13 +26,11 @@ func runShow(ctx context.Context, env *Env, c *spec.ShowCmd) int {
 		warnf(env, "%s", safeText(err.Error()))
 		return ExitUsage
 	}
-	for _, p := range res.Problems {
-		warnf(env, "skipped a template: %s", safeText(p))
-	}
+	warnProblems(env, res)
 
 	if list {
 		if asJSON {
-			_ = writeJSON(env.Stdout, map[string]any{"kind": kind, "source": res.Source, "templates": infos(res), "ignored": nonNil(res.Shadowed)})
+			_ = writeJSON(env.Stdout, map[string]any{"kind": kind, "source": res.Source, "templates": infos(res), "ignored": nonNil(res.Shadowed), "lookup_warnings": lookupWarnings(res)})
 			return ExitOK
 		}
 		if len(res.Templates) == 0 {
@@ -64,10 +62,11 @@ func runShow(ctx context.Context, env *Env, c *spec.ShowCmd) int {
 	if asJSON {
 		out := struct {
 			templateInfo
-			Body  string `json:"body"`
-			Title string `json:"title,omitempty"`
-			Form  any    `json:"form,omitempty"`
-		}{templateInfo: info(t), Body: body}
+			Body           string          `json:"body"`
+			Title          string          `json:"title,omitempty"`
+			Form           any             `json:"form,omitempty"`
+			LookupWarnings []lookupWarning `json:"lookup_warnings"`
+		}{templateInfo: info(t), Body: body, LookupWarnings: lookupWarnings(res)}
 		if t.Form != nil {
 			out.Title = t.Form.Title
 			out.Form = t.Form
