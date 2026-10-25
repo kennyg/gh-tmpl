@@ -48,6 +48,8 @@ The zizmor hook runs offline, so it skips the audits that query GitHub. `mise ru
 
 The [CI workflow](../.github/workflows/ci.yml) runs on every pull request and on every push to `main`. Each job installs its tools with `jdx/mise-action` at the versions in `mise.toml`, then runs a mise task.
 
+A job installs only the tools in its `install_args`. The workflow sets `MISE_AUTO_INSTALL` to `false`, so `mise run` does not install the other tools. Those installs had no GitHub token and could hit the GitHub API rate limit.
+
 | Job | Task |
 | --- | --- |
 | `test` | `mise run test` on Linux, macOS and Windows |

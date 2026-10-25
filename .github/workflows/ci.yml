@@ -7,6 +7,12 @@ on:
 
 permissions: {}
 
+env:
+  # A job installs only the tools in its install_args. Without this, `mise run`
+  # installs every other tool in mise.toml without a GitHub token, and the
+  # GitHub API rate limit can fail the job.
+  MISE_AUTO_INSTALL: "false"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
