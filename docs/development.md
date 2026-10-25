@@ -21,7 +21,9 @@ hk install
 | `mise run test:race` | The tests with the race detector |
 | `mise run lint` | golangci-lint, with the config in `.golangci.yml` |
 | `mise run vuln` | govulncheck |
-| `mise run lint:actions` | actionlint and zizmor on `.github/` |
+| `mise run lint:actionlint` | actionlint on the workflows |
+| `mise run lint:zizmor` | zizmor on `.github/`, with the auditor persona. It fails on findings of low severity or worse. |
+| `mise run lint:actions` | `lint:actionlint` and `lint:zizmor` |
 | `mise run release:check` | `goreleaser check` |
 | `mise run release:snapshot` | Builds every release binary into `dist/` without publishing |
 | `mise run generate` | Regenerates the parser, the command reference, the man page and the completions from `gh-tmpl.usage.kdl` |
@@ -39,6 +41,26 @@ hk install
 | `pre-push` | The pre-commit steps, plus `go test ./...` |
 
 Run `hk check --all` to run the checks on every file. Run `hk fix --all` to apply the fixes.
+
+The zizmor hook runs offline, so it skips the audits that query GitHub. `mise run lint:zizmor` runs them when `GH_TOKEN` or `GITHUB_TOKEN` is set.
+
+## CI
+
+The [CI workflow](../.github/workflows/ci.yml) runs on every pull request and on every push to `main`. Each job installs its tools with `jdx/mise-action` at the versions in `mise.toml`, then runs a mise task.
+
+| Job | Task |
+| --- | --- |
+| `test` | `mise run test` on Linux, macOS and Windows |
+| `race` | `mise run test:race` |
+| `lint` | `go mod tidy -diff`, `mise run lint` and `mise run release:check` |
+| `generated` | `mise run generate:check` |
+| `actionlint` | `mise run lint:actionlint` |
+| `zizmor` | `mise run lint:zizmor`, then a SARIF upload to code scanning |
+| `vuln` | `mise run vuln` |
+
+The workflow has no permissions at the top level. Each job asks for `contents: read` only. The `zizmor` job also has `security-events: write` to upload its SARIF results. The zizmor findings show on the repository's **Security** tab. The token of a pull request from a fork cannot write security events, so the upload step skips those pull requests. The zizmor step still fails the job on a finding.
+
+Every action is pinned to a commit SHA. Dependabot proposes action updates every week.
 
 ## Try your build
 
