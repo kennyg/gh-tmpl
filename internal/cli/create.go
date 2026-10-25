@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kennyg/gh-tmpl/internal/discover"
+	"github.com/kennyg/gh-tmpl/internal/spec"
 )
 
 // ghFlags lists the flags of "gh pr create" and "gh issue create" that take
@@ -27,6 +28,105 @@ var ghFlags = map[discover.Kind]map[string]string{
 	},
 }
 
+// ownFlags maps each long flag of "pr create" or "issue create" in the
+// generated parser to whether it takes a value. It includes --help.
+func ownFlags(kind discover.Kind) map[string]bool {
+	out := map[string]bool{"help": false}
+	for _, c := range spec.Root.Subcommands {
+		if c.Name != string(kind) {
+			continue
+		}
+		for _, s := range c.Subcommands {
+			if s.Name != "create" {
+				continue
+			}
+			for _, f := range s.Flags {
+				for _, l := range f.Longs {
+					out[l] = f.TakesValue
+				}
+			}
+		}
+	}
+	return out
+}
+
+// splitCreate sorts the words after "pr create" or "issue create" into the
+// words for gh-tmpl, which are its own flags and their values, and the words
+// for gh. Both keep the order of args, and no word is dropped, split or
+// joined. A flag that takes a value, of gh-tmpl or of gh, takes the next
+// word, so a value is never read as a flag. "--" and every word after it go
+// to gh.
+//
+// verify/GhTmpl/Argv.lean proves these rules on a model of this function,
+// and TestSplitCreateMatchesLean checks the function against the model.
+func splitCreate(kind discover.Kind, args []string) (own, gh []string) {
+	flags := ownFlags(kind)
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" {
+			return own, append(gh, args[i:]...)
+		}
+		takesValue, isOwn := ownFlag(flags, a)
+		if !isOwn {
+			takesValue = ghNeedsValue(kind, a)
+		}
+		n := 1
+		if takesValue && i+1 < len(args) {
+			n = 2
+		}
+		if isOwn {
+			own = append(own, args[i:i+n]...)
+		} else {
+			gh = append(gh, args[i:i+n]...)
+		}
+		i += n - 1
+	}
+	return own, gh
+}
+
+// ownFlag reports whether a is a gh-tmpl flag, and whether it needs the next
+// word as its value.
+func ownFlag(flags map[string]bool, a string) (needsValue, ok bool) {
+	if a == "-h" {
+		return false, true
+	}
+	if !strings.HasPrefix(a, "--") {
+		return false, false
+	}
+	name, _, hasValue := strings.Cut(a[2:], "=")
+	takesValue, ok := flags[name]
+	return ok && takesValue && !hasValue, ok
+}
+
+// ghNeedsValue reports whether a is a gh flag that takes the next word as
+// its value: a long flag without "=", or a cluster of short flags that ends
+// with one that takes a value.
+func ghNeedsValue(kind discover.Kind, a string) bool {
+	valued := ghFlags[kind]
+	if strings.HasPrefix(a, "--") {
+		_, ok := valued[a[2:]]
+		return ok && !strings.Contains(a, "=")
+	}
+	if !strings.HasPrefix(a, "-") {
+		return false
+	}
+	for j := 1; j < len(a); j++ {
+		if isShortValued(valued, a[j]) {
+			return j == len(a)-1
+		}
+	}
+	return false
+}
+
+func isShortValued(valued map[string]string, b byte) bool {
+	for _, short := range valued {
+		if short != "" && short[0] == b {
+			return true
+		}
+	}
+	return false
+}
+
 // createOpts holds the --tmpl-* flags, which the generated parser reads.
 type createOpts struct {
 	checkOpts
@@ -42,8 +142,8 @@ type createArgs struct {
 }
 
 // scanCreate reads the body, body file and repository flags from the
-// arguments for gh. It does not change the arguments. The generated parser
-// has already removed the --tmpl-* flags.
+// arguments for gh. It does not change the arguments. splitCreate has
+// already removed the --tmpl-* flags.
 func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 	var c createArgs
 	valued := ghFlags[kind]
@@ -68,6 +168,9 @@ func scanCreate(kind discover.Kind, args []string) (createArgs, error) {
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		switch {
+		case a == "--":
+			// gh reads the words after "--" as arguments, not flags.
+			return c, nil
 		case strings.HasPrefix(a, "--"):
 			name, value, hasValue := strings.Cut(a[2:], "=")
 			if _, ok := valued[name]; !ok {
