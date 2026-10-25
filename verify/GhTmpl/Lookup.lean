@@ -13,7 +13,11 @@ root cannot be read, or the files. The theorems say:
   TMP-1 review finding F1.
 * `find_first_with_templates`: a lookup with templates returns those of the
   first source that has any. Every source before it was skipped, missing as
-  a fallback, or empty.
+  a fallback, or empty. The result keeps the problems of that source and of
+  every repository before it, so a broken template in the first source is
+  reported when a fallback supplies the templates. This is TMP-5.
+* `find_no_templates_problems`: a lookup without templates keeps the
+  problems of every source.
 * `findIn_defaults`: the single-file template is the first candidate in the
   documented order: `.github/`, the root, `docs/`, and by name in each.
 * `findIn_folder`: the folder templates come from the first template folder
@@ -169,7 +173,8 @@ structure Result where
   source : Option Nat
   templates : List (Path × Bool)
   shadowed : List String
-  problems : Nat
+  /-- The index of the source of each problem, in the order found. -/
+  problems : List Nat
   deriving Repr
 
 def findAux (k : Kind) : Nat → Result → List Src → Except Err Result
@@ -182,12 +187,23 @@ def findAux (k : Kind) : Nat → Result → List Src → Except Err Result
     | .readErr => .error .readErr
     | .repo fs =>
       let st := findIn k fs
-      if st.templates != [] then .ok ⟨some i, st.templates, st.shadowed, st.problems⟩
-      else findAux k (i + 1) ⟨some i, [], st.shadowed, last.problems + st.problems⟩ ss
+      let problems := last.problems ++ List.replicate st.problems i
+      if st.templates != [] then .ok ⟨some i, st.templates, st.shadowed, problems⟩
+      else findAux k (i + 1) ⟨some i, [], st.shadowed, problems⟩ ss
 
 /-- The model of `Find`. -/
 def find (k : Kind) (srcs : List Src) : Except Err Result :=
-  findAux k 0 ⟨none, [], [], 0⟩ srcs
+  findAux k 0 ⟨none, [], [], []⟩ srcs
+
+/-- The problems of source `i`, one source index for each problem. -/
+def srcProblems (k : Kind) (i : Nat) : Src → List Nat
+  | .repo fs => List.replicate (findIn k fs).problems i
+  | _ => []
+
+/-- The problems of the sources `ss`, the first of which has index `i`. -/
+def problemsFrom (k : Kind) : Nat → List Src → List Nat
+  | _, [] => []
+  | i, s :: ss => srcProblems k i s ++ problemsFrom k (i + 1) ss
 
 /-! ## Theorems about the sources -/
 
@@ -208,7 +224,8 @@ theorem findAux_first (k : Kind) (i : Nat) (last : Result) (ss : List Src) (r : 
     (hl : last.templates = []) (h : findAux k i last ss = .ok r) (hr : r.templates ≠ []) :
     ∃ pre fs post, ss = pre ++ .repo fs :: post ∧ r.source = some (i + pre.length) ∧
       (findIn k fs).templates = r.templates ∧
-      ∀ j (hj : j < pre.length), passable k (i + j) pre[j] := by
+      (∀ j (hj : j < pre.length), passable k (i + j) pre[j]) ∧
+      r.problems = last.problems ++ problemsFrom k i (pre ++ [.repo fs]) := by
   induction ss generalizing i last with
   | nil =>
     simp only [findAux, Except.ok.injEq] at h
@@ -217,53 +234,94 @@ theorem findAux_first (k : Kind) (i : Nat) (last : Result) (ss : List Src) (r : 
   | cons s ss ih =>
     have shift : ∀ pre fs post, ss = pre ++ .repo fs :: post → r.source = some (i + 1 + pre.length) →
         (findIn k fs).templates = r.templates → (∀ j (hj : j < pre.length), passable k (i + 1 + j) pre[j]) →
+        r.problems = last.problems ++ srcProblems k i s ++ problemsFrom k (i + 1) (pre ++ [.repo fs]) →
         passable k i s →
         ∃ pre fs post, s :: ss = pre ++ .repo fs :: post ∧ r.source = some (i + pre.length) ∧
           (findIn k fs).templates = r.templates ∧
-          ∀ j (hj : j < pre.length), passable k (i + j) pre[j] := by
-      intro pre fs post hss hsrc htp hpass hs
-      refine ⟨s :: pre, fs, post, by simp [hss], by simp [hsrc]; omega, htp, ?_⟩
-      intro j hj
-      cases j with
-      | zero => simpa using hs
-      | succ j =>
-        have := hpass j (by simp at hj; omega)
-        simp only [List.getElem_cons_succ]
-        rwa [show i + (j + 1) = i + 1 + j by omega]
+          (∀ j (hj : j < pre.length), passable k (i + j) pre[j]) ∧
+          r.problems = last.problems ++ problemsFrom k i (pre ++ [.repo fs]) := by
+      intro pre fs post hss hsrc htp hpass hprob hs
+      refine ⟨s :: pre, fs, post, by simp [hss], by simp [hsrc]; omega, htp, ?_, ?_⟩
+      · intro j hj
+        cases j with
+        | zero => simpa using hs
+        | succ j =>
+          have := hpass j (by simp at hj; omega)
+          simp only [List.getElem_cons_succ]
+          rwa [show i + (j + 1) = i + 1 + j by omega]
+      · simp [hprob, problemsFrom, List.append_assoc]
     cases s with
     | openErr => simp [findAux] at h
     | readErr => simp [findAux] at h
     | skip =>
       simp only [findAux] at h
-      obtain ⟨pre, fs, post, a, b, c, d⟩ := ih (i + 1) last hl h
-      exact shift pre fs post a b c d trivial
+      obtain ⟨pre, fs, post, a, b, c, d, e⟩ := ih (i + 1) last hl h
+      exact shift pre fs post a b c d (by simp [e, srcProblems]) trivial
     | notFound =>
       simp only [findAux] at h
       split at h
       · simp at h
       · rename_i hi
-        obtain ⟨pre, fs, post, a, b, c, d⟩ := ih (i + 1) last hl h
-        exact shift pre fs post a b c d hi
+        obtain ⟨pre, fs, post, a, b, c, d, e⟩ := ih (i + 1) last hl h
+        exact shift pre fs post a b c d (by simp [e, srcProblems]) hi
     | repo fs =>
       simp only [findAux] at h
       split at h
       · rename_i hne
         simp only [Except.ok.injEq] at h
         subst h
-        exact ⟨[], fs, ss, rfl, by simp, rfl, fun j hj => by simp at hj⟩
+        exact ⟨[], fs, ss, rfl, by simp, rfl, fun j hj => by simp at hj,
+          by simp [problemsFrom, srcProblems]⟩
       · rename_i he
         simp only [bne_iff_ne, ne_eq, Decidable.not_not] at he
-        obtain ⟨pre, fs', post, a, b, c, d⟩ := ih (i + 1) _ rfl h
-        exact shift pre fs' post a b c d he
+        obtain ⟨pre, fs', post, a, b, c, d, e⟩ := ih (i + 1) _ rfl h
+        exact shift pre fs' post a b c d (by simp [e, srcProblems, List.append_assoc]) he
 
-/-- A lookup with templates returns those of the first source that has any. -/
+/-- A lookup with templates returns those of the first source that has any.
+It keeps the problems of that source and of every source before it. -/
 theorem find_first_with_templates (k : Kind) (ss : List Src) (r : Result)
     (h : find k ss = .ok r) (hr : r.templates ≠ []) :
     ∃ pre fs post, ss = pre ++ .repo fs :: post ∧ r.source = some pre.length ∧
       (findIn k fs).templates = r.templates ∧
-      ∀ j (hj : j < pre.length), passable k j pre[j] := by
-  obtain ⟨pre, fs, post, a, b, c, d⟩ := findAux_first k 0 _ ss r rfl h hr
-  exact ⟨pre, fs, post, a, by simpa using b, c, fun j hj => by simpa using d j hj⟩
+      (∀ j (hj : j < pre.length), passable k j pre[j]) ∧
+      r.problems = problemsFrom k 0 (pre ++ [.repo fs]) := by
+  obtain ⟨pre, fs, post, a, b, c, d, e⟩ := findAux_first k 0 _ ss r rfl h hr
+  exact ⟨pre, fs, post, a, by simpa using b, c, fun j hj => by simpa using d j hj, by simpa using e⟩
+
+theorem findAux_no_templates (k : Kind) (i : Nat) (last : Result) (ss : List Src) (r : Result)
+    (h : findAux k i last ss = .ok r) (hr : r.templates = []) :
+    r.problems = last.problems ++ problemsFrom k i ss := by
+  induction ss generalizing i last with
+  | nil =>
+    simp only [findAux, Except.ok.injEq] at h
+    subst h
+    simp [problemsFrom]
+  | cons s ss ih =>
+    cases s with
+    | openErr => simp [findAux] at h
+    | readErr => simp [findAux] at h
+    | skip =>
+      simp only [findAux] at h
+      simp [ih _ _ h, problemsFrom, srcProblems]
+    | notFound =>
+      simp only [findAux] at h
+      split at h
+      · simp at h
+      · simp [ih _ _ h, problemsFrom, srcProblems]
+    | repo fs =>
+      simp only [findAux] at h
+      split at h
+      · rename_i hne
+        simp only [Except.ok.injEq] at h
+        subst h
+        simp_all
+      · simp [ih _ _ h, problemsFrom, srcProblems, List.append_assoc]
+
+/-- A lookup without templates keeps the problems of every source. -/
+theorem find_no_templates_problems (k : Kind) (ss : List Src) (r : Result)
+    (h : find k ss = .ok r) (hr : r.templates = []) :
+    r.problems = problemsFrom k 0 ss := by
+  simpa using findAux_no_templates k 0 _ ss r h hr
 
 /-! ## Theorems about one repository -/
 
